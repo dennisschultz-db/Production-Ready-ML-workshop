@@ -1,0 +1,87 @@
+# =============================================================================
+# databricks.yml — Production-Ready ML Systems Workshop Automation Bundle
+# =============================================================================
+# Deploy to dev:  databricks bundle deploy
+# Deploy to prod: databricks bundle deploy --target prod
+# Run job:        databricks bundle run workshop_retrain_churn --target prod
+
+bundle:
+  name: Production-Ready-ML-workshop
+
+# =============================================================================
+# Artifacts — Python wheel for the churn_model package
+# =============================================================================
+# `databricks bundle deploy` builds this wheel automatically and uploads it
+# to the bundle's workspace artifact path.
+# 01_instructor_setup.ipynb then copies the wheel to the UC Volume so participant
+# notebooks can %pip install from a stable, shared path.
+artifacts:
+  churn_model_whl:
+    type: whl
+    path: ./wheels
+    build: pip wheel . --no-deps -q -w dist
+    files:
+      - source: wheels/dist/churn_model-0.1.0-py3-none-any.whl
+
+# Include job resource YAML files.
+# Note: serving_endpoint.yml is intentionally excluded — the instructor
+# creates the reference endpoint manually via 05_register_and_serve.ipynb
+# (same flow participants follow). Endpoints require a pre-registered model
+# to exist, which makes them unsuitable for automated bundle deployment.
+include:
+  - resources/*_job.yml
+
+# =============================================================================
+# Variables — override per target or via CLI with --var key=value
+# =============================================================================
+variables:
+  catalog:
+    description: Unity Catalog catalog name
+    default: workshop
+
+  schema:
+    description: Schema for shared/instructor resources
+    default: "00_shared"
+
+  notification_email:
+    description: Email address for job success/failure notifications
+    default: ${workspace.current_user.userName}
+
+# =============================================================================
+# Targets
+# =============================================================================
+targets:
+
+  # ---------------------------------------------------------------------------
+  # dev — for local testing during workshop development
+  # Uses the instructor's personal workspace and prefixes all resource names
+  # with [dev <username>] to avoid colliding with prod resources.
+  # ---------------------------------------------------------------------------
+  dev:
+    mode: development
+    default: true
+    workspace:
+      host: https://adb-7405617399099560.azuredatabricks.net/
+    variables:
+      catalog: "vectorcatalog02"
+      schema: "my-schema"
+
+
+  # ---------------------------------------------------------------------------
+  # prod — the actual workshop workspace
+  # Deployed by the instructor before the workshop and by GitHub Actions CI/CD.
+  # Uses a service principal to avoid tying resources to a personal account.
+  # ---------------------------------------------------------------------------
+  prod:
+    mode: production
+    workspace:
+      host: https://adb-7405617399099560.azuredatabricks.net/
+      # Service principal for CI/CD deployments — set DATABRICKS_TOKEN in GitHub Secrets
+      # to the service principal's OAuth token or PAT
+    variables:
+      catalog: workshop
+      schema: "00_shared"
+    run_as:
+      # Replace with the actual service principal application_id once created
+      # service_principal_name: workshop-service-principal
+      user_name: dennis.schultz@databricks.com   # Instructor fallback until SP is set up

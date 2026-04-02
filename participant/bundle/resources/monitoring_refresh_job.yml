@@ -1,0 +1,52 @@
+# =============================================================================
+# monitoring_refresh_job.yml — Scheduled Lakehouse Monitoring Refresh
+# =============================================================================
+# This job refreshes the Lakehouse Monitor for the instructor reference
+# inference table on a daily schedule.
+#
+# In the workshop, participants create their own monitors interactively in
+# 06_monitoring_setup.ipynb. This job keeps the instructor reference monitor
+# current and provides a working example of a scheduled monitoring job.
+#
+# Schedule: 6:00 AM Amsterdam time (UTC+2 in May)
+
+resources:
+  jobs:
+    workshop_monitoring_refresh:
+      name: workshop_monitoring_refresh
+      description: >
+        Daily Lakehouse Monitoring refresh for the instructor reference
+        inference table. Keeps the monitoring dashboard up to date and
+        demonstrates how to operationalize monitoring as a scheduled job.
+
+      tags:
+        workshop: "true"
+        session: "2"
+        type: "monitoring"
+        user: ${workspace.current_user.userName}
+
+      schedule:
+        quartz_cron_expression: "0 0 4 * * ?"   # 6:00 AM CEST = 4:00 AM UTC
+        timezone_id: "UTC"
+        pause_status: UNPAUSED
+
+      tasks:
+        - task_key: refresh_instructor_monitor
+          description: Refresh the monitoring metrics for the instructor inference table
+          notebook_task:
+            notebook_path: ../utils/refresh_monitors.ipynb
+            base_parameters:
+              catalog: ${var.catalog}
+              schema:  ${var.schema}
+          environment_key: sdk_env
+
+      environments:
+        - environment_key: sdk_env
+          spec:
+            client: "5"
+            dependencies:
+              - databricks-sdk>=0.20
+
+      email_notifications:
+        on_failure:
+          - "{{var.notification_email}}"

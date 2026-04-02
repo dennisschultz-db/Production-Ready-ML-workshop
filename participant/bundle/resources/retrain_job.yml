@@ -1,0 +1,123 @@
+# =============================================================================
+# retrain_job.yml — Session 2 CI/CD Retrain Pipeline
+# =============================================================================
+# This is the core CI/CD job participants trigger in Session 2.
+# It implements the full MLOps loop:
+#
+#   ingest_and_validate → train_models → gate_and_register → update_endpoint
+#
+# If any task fails, downstream tasks are skipped automatically.
+# The deployment gate (task 3) blocks promotion of worse models.
+#
+# Deploy: databricks bundle deploy
+# Run:    databricks bundle run workshop_retrain_churn
+#         OR via Databricks SDK (see src/session2/02_trigger_retrain.ipynb)
+
+resources:
+  jobs:
+    workshop_retrain_churn:
+      name: workshop_retrain_churn
+      description: >
+        Session 2 CI/CD pipeline — triggered automatically on merge to main
+        via GitHub Actions, or manually by participants in Session 2.
+        Implements: data validation → training → deployment gate → endpoint update.
+
+      tags:
+        workshop: "true"
+        session: "2"
+        user: ${workspace.current_user.userName}
+
+      parameters:
+        - name: catalog
+          default: ${var.catalog}
+        - name: schema
+          default: ${var.schema}
+        - name: endpoint_name
+          default: churn_${var.schema}
+        - name: experiment_name
+          default: /Users/${workspace.current_user.userName}/churn_${var.schema}
+        - name: config_path
+          default: "/Workspace/Users/${workspace.current_user.userName}/Production-ready-ML-workshop/participant/common/config.yml"
+
+      tasks:
+        # ---------------------------------------------------------------
+        # Task 1: Validate incoming data before training
+        # If data quality checks fail, the job stops here.
+        # ---------------------------------------------------------------
+        - task_key: ingest_and_validate
+          description: Run data quality checks on the source table
+          notebook_task:
+            notebook_path: ../jobs/01_ingest_and_validate.ipynb
+            base_parameters:
+              catalog:     "{{job.parameters.catalog}}"
+              schema:      "{{job.parameters.schema}}"
+              config_path: "{{job.parameters.config_path}}"
+          environment_key: ml_env
+
+        # ---------------------------------------------------------------
+        # Task 2: Train all model types, select best by F1
+        # Passes best_run_id to downstream tasks via task values.
+        # ---------------------------------------------------------------
+        - task_key: train_models
+          description: Train LR, RF, GBT and select best model by F1
+          depends_on:
+            - task_key: ingest_and_validate
+          notebook_task:
+            notebook_path: ../jobs/02_train_models.ipynb
+            base_parameters:
+              catalog: "{{job.parameters.catalog}}"
+              schema:  "{{job.parameters.schema}}"
+              experiment_name: "{{job.parameters.experiment_name}}"
+              config_path: "{{job.parameters.config_path}}"
+          environment_key: ml_env
+
+        # ---------------------------------------------------------------
+        # Task 3: Deployment gate — compare challenger vs champion
+        # Fails (and blocks Task 4) if F1 drops more than 5%.
+        # If passing: registers challenger as new champion in UC.
+        # ---------------------------------------------------------------
+        - task_key: gate_and_register
+          description: >
+            Compare challenger to current champion. Register new champion
+            only if F1 does not degrade by more than 5%.
+          depends_on:
+            - task_key: train_models
+          notebook_task:
+            notebook_path: ../jobs/03_gate_and_register.ipynb
+            base_parameters:
+              catalog: "{{job.parameters.catalog}}"
+              schema:  "{{job.parameters.schema}}"
+              config_path: "{{job.parameters.config_path}}"
+          environment_key: ml_env
+
+        # ---------------------------------------------------------------
+        # Task 4: Update the serving endpoint to the new champion version
+        # Only runs if Task 3 succeeded (gate passed and model registered).
+        # ---------------------------------------------------------------
+        - task_key: update_endpoint
+          description: Point the serving endpoint to the newly registered champion
+          depends_on:
+            - task_key: gate_and_register
+          notebook_task:
+            notebook_path: ../jobs/04_update_endpoint.ipynb
+            base_parameters:
+              catalog:       "{{job.parameters.catalog}}"
+              schema:        "{{job.parameters.schema}}"
+              endpoint_name: "{{job.parameters.endpoint_name}}"
+          environment_key: ml_env
+
+      environments:
+        - environment_key: ml_env
+          spec:
+            client: "5"
+            dependencies:
+              - scikit-learn>=1.3
+              - mlflow>=2.10
+              - pyyaml>=6.0
+              - databricks-sdk>=0.20
+
+      email_notifications:
+        on_failure:
+          - "{{var.notification_email}}"
+        on_success:
+          - "{{var.notification_email}}"

@@ -1,0 +1,99 @@
+# =============================================================================
+# Production-Ready ML Systems Workshop — Shared Configuration
+# =============================================================================
+# This file is the single source of truth for model configuration.
+# It is read by the churn_model package and referenced in all training notebooks.
+# To override for an experiment, copy this file and modify as needed.
+
+catalog: dennis_schultz
+model_name: churn_classifier
+
+# Target column
+target_column: Churn
+positive_class: "Yes"   # The class that represents a churned customer
+
+# Feature definitions — shared between training and serving (parity guarantee)
+feature_columns:
+  numeric:
+    - tenure
+    - MonthlyCharges
+    - TotalCharges
+  categorical:
+    - gender
+    - SeniorCitizen
+    - Partner
+    - Dependents
+    - PhoneService
+    - MultipleLines
+    - InternetService
+    - OnlineSecurity
+    - OnlineBackup
+    - DeviceProtection
+    - TechSupport
+    - StreamingTV
+    - StreamingMovies
+    - Contract
+    - PaperlessBilling
+    - PaymentMethod
+
+# Column to drop (not a feature, not a label)
+id_column: customerID
+
+# Train / test split
+training:
+  test_size: 0.20
+  random_state: 42
+  cv_folds: 3              # Cross-validation folds used during hyperparameter search
+  primary_metric: f1       # Metric used to select the best model (f1, roc_auc, precision, recall)
+
+# Models and their hyperparameter grids
+models:
+  logistic_regression:
+    C: [0.01, 0.1, 1.0]
+    max_iter: [200]
+    solver: ["lbfgs"]
+    class_weight: ["balanced"]
+
+  random_forest:
+    n_estimators: [100, 200]
+    max_depth: [5, 10, null]
+    min_samples_leaf: [1, 5]
+    class_weight: ["balanced"]
+
+  gradient_boosted_trees:
+    n_estimators: [100, 200]
+    learning_rate: [0.05, 0.1]
+    max_depth: [3, 5]
+    subsample: [0.8, 1.0]
+
+# Model serving
+serving:
+  scale_to_zero_enabled: true
+  workload_size: Small          # Small | Medium | Large
+  # min_provisioned_throughput: 0
+  # max_provisioned_throughput: 2
+
+# Lakehouse Monitoring
+monitoring:
+  inference_table_suffix: churn_inference_log
+  baseline_table: workshop.`00_shared`.telco_churn
+  granularities:
+    - "1 day"
+  drift_thresholds:
+    psi: 0.20             # Population Stability Index — above this = significant drift
+  accuracy_degradation_threshold: 0.05   # Relative F1 drop that triggers an alert
+
+# Data quality checks
+data_quality:
+  tenure:
+    min: 0
+    max: 100
+  MonthlyCharges:
+    min: 0.0
+    max: 500.0
+  TotalCharges:
+    min: 0.0
+    max: 100000.0
+  expected_churn_rate:
+    min: 0.10
+    max: 0.60
