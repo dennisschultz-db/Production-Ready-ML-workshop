@@ -37,7 +37,7 @@ resources:
         - name: experiment_name
           default: /Users/${workspace.current_user.userName}/churn_${var.schema}
         - name: config_path
-          default: "/Workspace/Users/${workspace.current_user.userName}/Production-ready-ML-workshop/participant/common/config.yml"
+          default: "/Workspace/Users/${workspace.current_user.userName}/Production-Ready-ML-workshop/participant/common/config.yml"
 
       tasks:
         # ---------------------------------------------------------------

@@ -31,9 +31,13 @@ resources:
         - name: experiment_name
           default: /Users/${workspace.current_user.userName}/churn_${var.schema}
         - name: config_path
-          default: "/Workspace/Users/${workspace.current_user.userName}/Production-ready-ML-workshop/participant/common/config.yml"
+          default: "/Workspace/Users/${workspace.current_user.userName}/Production-Ready-ML-workshop/participant/common/config.yml"
 
       tasks:
+        # ---------------------------------------------------------------
+        # Task 1: Train all model types, select best by F1
+        # Passes best_run_id to downstream tasks via task values.
+        # ---------------------------------------------------------------
         - task_key: train_all_models
           description: Train all three model types and pick the best by F1
           notebook_task:
