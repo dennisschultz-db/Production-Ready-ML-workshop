@@ -38,6 +38,8 @@ resources:
           default: /Users/${workspace.current_user.userName}/churn_${var.schema}
         - name: config_path
           default: "/Workspace/Users/${workspace.current_user.userName}/Production-Ready-ML-workshop/participant/common/config.yml"
+        - name: source_table
+          default: ""
 
       tasks:
         # ---------------------------------------------------------------
@@ -49,9 +51,10 @@ resources:
           notebook_task:
             notebook_path: ../jobs/01_ingest_and_validate.ipynb
             base_parameters:
-              catalog:     "{{job.parameters.catalog}}"
-              schema:      "{{job.parameters.schema}}"
-              config_path: "{{job.parameters.config_path}}"
+              catalog:      "{{job.parameters.catalog}}"
+              schema:       "{{job.parameters.schema}}"
+              config_path:  "{{job.parameters.config_path}}"
+              source_table: "{{job.parameters.source_table}}"
           environment_key: ml_env
 
         # ---------------------------------------------------------------
@@ -65,10 +68,11 @@ resources:
           notebook_task:
             notebook_path: ../jobs/02_train_models.ipynb
             base_parameters:
-              catalog: "{{job.parameters.catalog}}"
-              schema:  "{{job.parameters.schema}}"
+              catalog:         "{{job.parameters.catalog}}"
+              schema:          "{{job.parameters.schema}}"
               experiment_name: "{{job.parameters.experiment_name}}"
-              config_path: "{{job.parameters.config_path}}"
+              config_path:     "{{job.parameters.config_path}}"
+              source_table:    "{{job.parameters.source_table}}"
           environment_key: ml_env
 
         # ---------------------------------------------------------------
