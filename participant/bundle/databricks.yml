@@ -60,8 +60,6 @@ targets:
   dev:
     mode: development
     default: true
-    workspace:
-      host: https://adb-7405617399099560.azuredatabricks.net/
     variables:
       catalog: "vectorcatalog02"
       schema: "my-schema"
