@@ -89,9 +89,10 @@ def run_training(
     config: dict,
     model_type: str = "random_forest",
     experiment_name: Optional[str] = None,
-    source_table: str = "workshop.`00_shared`.telco_churn",
     run_name: Optional[str] = None,
     data: Optional[pd.DataFrame] = None,
+    fe=None,
+    training_set=None,
 ) -> TrainResult:
     """
     Train a single model type and log everything to MLflow.
@@ -108,13 +109,17 @@ def run_training(
         One of: 'logistic_regression', 'random_forest', 'gradient_boosted_trees'.
     experiment_name : str, optional
         MLflow experiment path. Defaults to /Users/{current_user}/churn_{schema}.
-    source_table : str
-        Fully qualified Delta table to read training data from.
     run_name : str, optional
         Human-readable name for this MLflow run.
     data : pd.DataFrame, optional
-        Pre-loaded DataFrame. When provided, skips Spark loading entirely.
-        Useful for unit tests and local development without a Spark session.
+        Pre-loaded DataFrame. Used for unit tests / local development without
+        a Spark session.  Takes precedence over training_set if both are given.
+    fe : FeatureEngineeringClient, optional
+        Databricks Feature Engineering client. When provided, the model is logged
+        with fe.log_model() so the serving endpoint auto-fetches features by key.
+    training_set : TrainingSet, optional
+        Result of fe.create_training_set(). When provided (and data is None),
+        loads the training DataFrame via training_set.load_df().
 
     Returns
     -------
@@ -124,24 +129,14 @@ def run_training(
     # -- Load data --
     if data is not None:
         df = data
+    elif training_set is not None:
+        df = training_set.load_df().toPandas()
     else:
-        try:
-            from pyspark.sql import SparkSession
-            spark = SparkSession.getActiveSession()
-            if spark is None:
-                raise RuntimeError("No active SparkSession")
-            df = spark.table(source_table).toPandas()
-        except ImportError:
-            raise RuntimeError(
-                "pyspark is not installed and no 'data' DataFrame was provided. "
-                "Pass data=your_dataframe to run_training() in test environments."
-            )
-        except Exception as e:
-            raise RuntimeError(
-                f"Could not read '{source_table}' from Spark: {e}. "
-                "Ensure you are running inside a Databricks notebook or cluster, "
-                "or pass data=your_dataframe directly."
-            )
+        raise ValueError(
+            "Either 'data' or 'training_set' must be provided. "
+            "Pass data=your_dataframe for local/test use, or "
+            "fe=fe_client and training_set=training_set for production use."
+        )
 
     X, y = prepare_dataframe(df, config)
 
@@ -181,7 +176,6 @@ def run_training(
     with mlflow.start_run(run_name=run_name) as run:
         # Log config parameters
         mlflow.log_param("model_type", model_type)
-        mlflow.log_param("source_table", source_table)
         mlflow.log_param("test_size", config["training"]["test_size"])
         mlflow.log_param("random_state", config["training"]["random_state"])
 
@@ -216,14 +210,24 @@ def run_training(
         report = classification_report(y_test, y_pred, target_names=["No Churn", "Churn"])
         mlflow.log_text(report, "classification_report.txt")
 
-        # Log the model with an input example for schema inference
+        # Log the model — use Feature Engineering client when available so the
+        # serving endpoint knows how to auto-fetch features by lookup key.
         input_example = X_test.head(5)
-        mlflow.sklearn.log_model(
-            pipeline,
-            name="model",
-            input_example=input_example,
-            registered_model_name=None,  # Don't auto-register; user does this explicitly
-        )
+        if fe is not None and training_set is not None:
+            fe.log_model(
+                model=pipeline,
+                artifact_path="model",
+                flavor=mlflow.sklearn,
+                training_set=training_set,
+                registered_model_name=None,  # Don't auto-register; done explicitly later
+            )
+        else:
+            mlflow.sklearn.log_model(
+                pipeline,
+                name="model",
+                input_example=input_example,
+                registered_model_name=None,  # Don't auto-register; done explicitly later
+            )
 
         model_uri = f"runs:/{run.info.run_id}/model"
 
@@ -249,11 +253,19 @@ def run_all_models(
     schema: str,
     config: dict,
     experiment_name: Optional[str] = None,
-    source_table: str = "workshop.`00_shared`.telco_churn",
+    fe=None,
+    training_set=None,
 ) -> list[TrainResult]:
     """
     Train all three model types in sequence and return their results.
     Used by the retrain job and the mlflow_experiment notebook.
+
+    Parameters
+    ----------
+    fe : FeatureEngineeringClient, optional
+        Databricks Feature Engineering client. Passed through to run_training().
+    training_set : TrainingSet, optional
+        Result of fe.create_training_set(). Passed through to run_training().
 
     Returns
     -------
@@ -270,7 +282,8 @@ def run_all_models(
             config=config,
             model_type=model_type,
             experiment_name=experiment_name,
-            source_table=source_table,
+            fe=fe,
+            training_set=training_set,
         )
         results.append(result)
     return results

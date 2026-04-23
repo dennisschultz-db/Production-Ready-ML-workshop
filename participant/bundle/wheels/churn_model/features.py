@@ -1,14 +1,22 @@
 """
-features.py — Feature engineering pipeline
+features.py — Feature transformation pipeline
 
-This module is the SINGLE SOURCE OF TRUTH for feature preprocessing.
+This module handles the TRANSFORMATION layer of feature preprocessing.
+
 It is imported identically during:
   - Training (churn_model/train.py)
   - Batch inference (churn_model/predict.py)
-  - Model serving (the pyfunc wrapper uses this pipeline)
+  - Model serving (embedded in the logged sklearn Pipeline)
 
-Keeping preprocessing in one place prevents train/serving skew — one of the
-most common sources of production ML bugs.
+Two layers work together to prevent train/serving skew:
+
+  1. Databricks Feature Engineering (Feature Store) — handles VALUE consistency.
+     The same raw feature values are stored once and retrieved at both training
+     and serving time, so the model never sees different input distributions.
+
+  2. This module — handles TRANSFORMATION consistency.
+     Imputation, scaling, and encoding are defined once here and embedded in
+     the MLflow artifact. The same sklearn Pipeline runs in every environment.
 """
 
 from __future__ import annotations
