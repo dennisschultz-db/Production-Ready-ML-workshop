@@ -24,10 +24,6 @@ artifacts:
       - source: wheels/dist/churn_model-0.1.0-py3-none-any.whl
 
 # Include job resource YAML files.
-# Note: serving_endpoint.yml is intentionally excluded — the instructor
-# creates the reference endpoint manually via 05_register_and_serve.ipynb
-# (same flow participants follow). Endpoints require a pre-registered model
-# to exist, which makes them unsuitable for automated bundle deployment.
 include:
   - resources/*_job.yml
 
