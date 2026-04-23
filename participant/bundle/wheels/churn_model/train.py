@@ -221,6 +221,15 @@ def run_training(
                 training_set=training_set,
                 registered_model_name=None,  # Don't auto-register; done explicitly later
             )
+            # fe.log_model() produces a pyfunc artifact that does not expose the
+            # sklearn flavor directly, so the deployment gate (which needs
+            # predict_proba) cannot load it with mlflow.sklearn.load_model().
+            # Log the raw sklearn pipeline separately for gate evaluation.
+            mlflow.sklearn.log_model(
+                pipeline,
+                name="model_pipeline",
+                input_example=input_example,
+            )
         else:
             mlflow.sklearn.log_model(
                 pipeline,

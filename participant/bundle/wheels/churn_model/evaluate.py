@@ -143,6 +143,7 @@ def evaluate_gate(
     from churn_model.features import prepare_dataframe
 
     mlflow.set_registry_uri("databricks-uc")
+    client = MlflowClient()
 
     # Convert Spark DataFrame if needed
     if hasattr(test_data, "toPandas"):
@@ -150,8 +151,21 @@ def evaluate_gate(
 
     X_test, y_test = prepare_dataframe(test_data, config)
 
+    def _load_sklearn(run_id: str):
+        """
+        Load the sklearn pipeline from an MLflow run.
+
+        Tries 'model_pipeline' first (logged by train.py when fe.log_model() is
+        used — a separate raw-sklearn artifact kept alongside the pyfunc artifact).
+        Falls back to 'model' for runs logged without the Feature Store.
+        """
+        try:
+            return mlflow.sklearn.load_model(f"runs:/{run_id}/model_pipeline")
+        except Exception:
+            return mlflow.sklearn.load_model(f"runs:/{run_id}/model")
+
     # Load challenger from MLflow run
-    challenger_model = mlflow.sklearn.load_model(f"runs:/{challenger_run_id}/model")
+    challenger_model = _load_sklearn(challenger_run_id)
     y_pred_c = challenger_model.predict(X_test)
     y_prob_c = challenger_model.predict_proba(X_test)[:, 1]
     challenger_metrics = {
@@ -160,9 +174,22 @@ def evaluate_gate(
         "recall":  recall_score(y_test, y_pred_c, zero_division=0),
     }
 
-    # Load champion from UC registry
+    # Load champion from UC registry — resolve to a run_id so we can use
+    # _load_sklearn() which knows about the model_pipeline artifact path.
     try:
-        champion_model = mlflow.sklearn.load_model(champion_model_uri)
+        # Parse "models:/<name>@<alias>" → look up source run_id via MlflowClient
+        model_part = champion_model_uri.replace("models:/", "")
+        if "@" in model_part:
+            champion_name, alias = model_part.rsplit("@", 1)
+            mv = client.get_model_version_by_alias(champion_name, alias)
+            champion_run_id = mv.run_id
+        else:
+            # Version-pinned URI "models:/<name>/<version>"
+            name, version = model_part.rsplit("/", 1)
+            mv = client.get_model_version(name, version)
+            champion_run_id = mv.run_id
+
+        champion_model = _load_sklearn(champion_run_id)
         y_pred_ch = champion_model.predict(X_test)
         y_prob_ch = champion_model.predict_proba(X_test)[:, 1]
         champion_metrics = {
