@@ -4,14 +4,17 @@
 # This is the core CI/CD job participants trigger in Session 2.
 # It implements the full MLOps loop:
 #
-#   ingest_and_validate → train_models → gate_and_register → update_endpoint
+#   feature_engineering → ingest_and_validate → train_models
+#                       → gate_and_register   → update_endpoint
 #
 # If any task fails, downstream tasks are skipped automatically.
-# The deployment gate (task 3) blocks promotion of worse models.
+# The deployment gate (task 4) blocks promotion of worse models.
+# update_endpoint deploys the new @serving version (raw sklearn pipeline)
+# as a 90/10 canary alongside the existing champion.
 #
 # Deploy: databricks bundle deploy
 # Run:    databricks bundle run workshop_retrain_churn
-#         OR via Databricks SDK (see src/session2/02_trigger_retrain.ipynb)
+#         OR via Databricks SDK (see participant/session2/05_trigger_retrain.ipynb)
 
 resources:
   jobs:
@@ -20,7 +23,7 @@ resources:
       description: >
         Session 2 CI/CD pipeline — triggered automatically on merge to main
         via GitHub Actions, or manually by participants in Session 2.
-        Implements: data validation → training → deployment gate → endpoint update.
+        Implements: feature engineering → data validation → training → deployment gate → endpoint update.
 
       tags:
         workshop: "true"
@@ -43,11 +46,29 @@ resources:
 
       tasks:
         # ---------------------------------------------------------------
-        # Task 1: Validate incoming data before training
+        # Task 1: Write/update the Unity Catalog Feature Store table
+        # Reads source_table, extracts feature columns, upserts by customerID.
+        # Passes feature_table_name to downstream tasks via task values.
+        # ---------------------------------------------------------------
+        - task_key: feature_engineering
+          description: Create or update the Feature Store table from the source data
+          notebook_task:
+            notebook_path: ../jobs/00_feature_engineering.ipynb
+            base_parameters:
+              catalog:      "{{job.parameters.catalog}}"
+              schema:       "{{job.parameters.schema}}"
+              config_path:  "{{job.parameters.config_path}}"
+              source_table: "{{job.parameters.source_table}}"
+          environment_key: ml_env
+
+        # ---------------------------------------------------------------
+        # Task 2: Validate incoming data before training
         # If data quality checks fail, the job stops here.
         # ---------------------------------------------------------------
         - task_key: ingest_and_validate
           description: Run data quality checks on the source table
+          depends_on:
+            - task_key: feature_engineering
           notebook_task:
             notebook_path: ../jobs/01_ingest_and_validate.ipynb
             base_parameters:
@@ -58,11 +79,12 @@ resources:
           environment_key: ml_env
 
         # ---------------------------------------------------------------
-        # Task 2: Train all model types, select best by F1
+        # Task 3: Train all model types, select best by F1
+        # Reads features from the Feature Store; labels from source_table.
         # Passes best_run_id to downstream tasks via task values.
         # ---------------------------------------------------------------
         - task_key: train_models
-          description: Train LR, RF, GBT and select best model by F1
+          description: Train LR, RF, GBT using Feature Store training set
           depends_on:
             - task_key: ingest_and_validate
           notebook_task:
@@ -76,14 +98,17 @@ resources:
           environment_key: ml_env
 
         # ---------------------------------------------------------------
-        # Task 3: Deployment gate — compare challenger vs champion
-        # Fails (and blocks Task 4) if F1 drops more than 5%.
-        # If passing: registers challenger as new champion in UC.
+        # Task 4: Deployment gate — compare challenger vs champion
+        # Fails if F1 drops more than 5%.
+        # If passing: registers model/ as @champion (batch) and
+        # model_pipeline/ as @serving (endpoint); passes serving_version
+        # to update_endpoint via task values.
         # ---------------------------------------------------------------
         - task_key: gate_and_register
           description: >
-            Compare challenger to current champion. Register new champion
-            only if F1 does not degrade by more than 5%.
+            Compare challenger to current champion. Register new @champion
+            (batch) and @serving (endpoint) only if F1 does not degrade by
+            more than 5%.
           depends_on:
             - task_key: train_models
           notebook_task:
@@ -95,11 +120,14 @@ resources:
           environment_key: ml_env
 
         # ---------------------------------------------------------------
-        # Task 4: Update the serving endpoint to the new champion version
-        # Only runs if Task 3 succeeded (gate passed and model registered).
+        # Task 5: Update the serving endpoint to the new @serving version
+        # Deploys as a 90/10 canary alongside the current stable version.
+        # Only runs if Task 4 succeeded (gate passed and models registered).
         # ---------------------------------------------------------------
         - task_key: update_endpoint
-          description: Point the serving endpoint to the newly registered champion
+          description: >
+            Point the serving endpoint to the newly registered @serving version
+            as a 10% canary alongside the existing stable version (90%).
           depends_on:
             - task_key: gate_and_register
           notebook_task:
@@ -119,6 +147,7 @@ resources:
               - mlflow>=2.10
               - pyyaml>=6.0
               - databricks-sdk>=0.20
+              - databricks-feature-engineering>=0.2
 
       email_notifications:
         on_failure:
