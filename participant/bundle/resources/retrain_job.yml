@@ -4,14 +4,13 @@
 # This is the core CI/CD job participants trigger in Session 2.
 # It implements the full MLOps loop:
 #
-#   feature_engineering → ingest_and_validate → train_models → gate_and_register
+#   feature_engineering → ingest_and_validate → train_models
+#                       → gate_and_register   → update_endpoint
 #
 # If any task fails, downstream tasks are skipped automatically.
 # The deployment gate (task 4) blocks promotion of worse models.
-#
-# The churn classifier is a batch inference model — fe.score_batch() is the
-# production scoring pattern. The serving endpoint created in Session 1 is
-# illustrative and is not updated by this pipeline.
+# update_endpoint deploys the new @serving version (raw sklearn pipeline)
+# as a 90/10 canary alongside the existing champion.
 #
 # Deploy: databricks bundle deploy
 # Run:    databricks bundle run workshop_retrain_churn
@@ -24,7 +23,7 @@ resources:
       description: >
         Session 2 CI/CD pipeline — triggered automatically on merge to main
         via GitHub Actions, or manually by participants in Session 2.
-        Implements: feature engineering → data validation → training → deployment gate.
+        Implements: feature engineering → data validation → training → deployment gate → endpoint update.
 
       tags:
         workshop: "true"
@@ -36,6 +35,8 @@ resources:
           default: ${var.catalog}
         - name: schema
           default: ${var.schema}
+        - name: endpoint_name
+          default: churn_${var.schema}
         - name: experiment_name
           default: /Users/${workspace.current_user.userName}/churn_${var.schema}
         - name: config_path
@@ -99,12 +100,15 @@ resources:
         # ---------------------------------------------------------------
         # Task 4: Deployment gate — compare challenger vs champion
         # Fails if F1 drops more than 5%.
-        # If passing: registers challenger as new @champion in UC.
+        # If passing: registers model/ as @champion (batch) and
+        # model_pipeline/ as @serving (endpoint); passes serving_version
+        # to update_endpoint via task values.
         # ---------------------------------------------------------------
         - task_key: gate_and_register
           description: >
             Compare challenger to current champion. Register new @champion
-            only if F1 does not degrade by more than 5%.
+            (batch) and @serving (endpoint) only if F1 does not degrade by
+            more than 5%.
           depends_on:
             - task_key: train_models
           notebook_task:
@@ -113,6 +117,25 @@ resources:
               catalog: "{{job.parameters.catalog}}"
               schema:  "{{job.parameters.schema}}"
               config_path: "{{job.parameters.config_path}}"
+          environment_key: ml_env
+
+        # ---------------------------------------------------------------
+        # Task 5: Update the serving endpoint to the new @serving version
+        # Deploys as a 90/10 canary alongside the current stable version.
+        # Only runs if Task 4 succeeded (gate passed and models registered).
+        # ---------------------------------------------------------------
+        - task_key: update_endpoint
+          description: >
+            Point the serving endpoint to the newly registered @serving version
+            as a 10% canary alongside the existing stable version (90%).
+          depends_on:
+            - task_key: gate_and_register
+          notebook_task:
+            notebook_path: ../jobs/04_update_endpoint.ipynb
+            base_parameters:
+              catalog:       "{{job.parameters.catalog}}"
+              schema:        "{{job.parameters.schema}}"
+              endpoint_name: "{{job.parameters.endpoint_name}}"
           environment_key: ml_env
 
       environments:
