@@ -4,7 +4,7 @@
       "name": "dataset1",
       "displayName": "telco_churn",
       "queryLines": [
-        "SELECT * FROM dennis_schultz_azure_classic01.`00_shared`.telco_churn"
+        "SELECT * FROM vectorcatalog02.`00_shared`.telco_churn"
       ],
       "columns": [
         {
@@ -43,7 +43,7 @@
         "  Service,\n",
         "  Status\n",
         "FROM\n",
-        "  dennis_schultz_azure_classic01.`00_shared`.telco_churn\n",
+        "  vectorcatalog02.`00_shared`.telco_churn\n",
         "    UNPIVOT (\n",
         "      Status FOR Service IN (\n",
         "        OnlineSecurity,\n",
@@ -103,7 +103,7 @@
         "    1\n",
         "  ) AS ChurnRatePct\n",
         "FROM\n",
-        "  dennis_schultz_azure_classic01.`00_shared`.telco_churn\n",
+        "  vectorcatalog02.`00_shared`.telco_churn\n",
         "    UNPIVOT (\n",
         "      Status FOR Service IN (\n",
         "        OnlineSecurity,\n",
