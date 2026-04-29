@@ -2,7 +2,7 @@
 
 
 |               |                                                                                               |
-| --------------- | :---------------------------------------------------------------------------------------------- |
+| --------------- | :-------------------------------------------------------------------------------------------- |
 | **Format:**   | Two 2-hour instructor-led sessions with hands-on exercises                                    |
 | **Dataset:**  | IBM Telco Customer Churn — binary classification, ~7K rows                                   |
 | **Platform:** | Databricks (serverless notebooks, Unity Catalog, MLflow, Model Serving, Lakehouse Monitoring) |
@@ -11,220 +11,218 @@
 
 ## Scenario
 
-Participants will take a customer churn prediction model from a messy notebook all the way through to a fully monitored production deployment. They will refactor a prototype into a testable Python package, run MLflow experiments to compare Logistic Regression, Random Forest, and Gradient Boosted Trees, register the best model in Unity Catalog with a `@champion` alias, deploy it as a rate-limited REST endpoint via AI Gateway, and query it live — including a Foundation Model API call that generates a human-readable explanation of the prediction. In Session 2, the focus shifts to automation and resilience: participants trigger an automated retraining pipeline, observe a deployment gate block a underperforming model, configure a canary traffic split, inject realistic data drift, create a Lakehouse Monitor to detect it, set up an alert, and then walk through an end-to-end incident runbook — diagnosing the drift, rolling back to the previous champion, and re-triggering retraining.
+Participants take a customer churn prediction model from a messy notebook all the way through to a fully monitored production deployment. In Session 1 they refactor a prototype into a testable Python package, run MLflow experiments to compare Logistic Regression, Random Forest, and Gradient Boosted Trees, register the best model in Unity Catalog with `@champion` and `@serving` aliases, deploy it as a rate-limited REST endpoint via AI Gateway, and use a Foundation Model API to generate a human-readable explanation of each prediction — with the shared prompt versioned in the MLflow Prompt Registry. In Session 2 the focus shifts to automation and resilience: participants deploy a CI/CD pipeline using Declarative Automation Bundles, inject realistic data drift, create a Lakehouse Monitor to detect it, wire an alert, trigger an automated retraining pipeline, and walk through an incident runbook — diagnosing drift, rolling back to the previous champion, and re-triggering retraining.
 
-## Workshop Outline
+---
 
-### Session 1 — Building Production-Grade ML (~2 hrs)
+## Session 1 — Building Production-Grade ML (~2 hrs)
 
+> **Pre-session:** Participants run `00_setup_participant.ipynb` before the formal session begins to create their personal schema and verify data access.
 
-| Step              | What they do                                                               | What they learn                                                  |
-| ------------------- | ---------------------------------------------------------------------------- | ------------------------------------------------------------------ |
-| EDA               | Explore Telco dataset                                                      | Class imbalance, null handling, feature distributions            |
-| Code quality      | Compare messy notebook vs refactored`churn_model` package                  | Why notebooks fail at scale; modular ML code                     |
-| Train models      | Run LR, RF, and GBT experiments                                            | MLflow autolog: params, metrics, artifacts                       |
-| Compare & select  | Navigate MLflow experiment UI                                              | Pick best model by F1; understand run lineage                    |
-| Register & deploy | Register to Unity Catalog, assign`@champion` alias, deploy endpoint        | Model Registry, aliases, Model Serving, AI Gateway rate limiting |
-| Serve & explain   | Query endpoint via REST, call Foundation Model API for a churn explanation | Live prediction, LLM augmentation                                |
-| Reality check     | Run pytest + data quality checks, review scorecard                         | 5 things done, 5 still missing → sets up Session 2              |
-
-**What participants leave with:**
-
-* How to structure ML code as a testable, reusable Python package instead of a monolithic notebook — and why it matters when models go to production
-* How to use MLflow to track experiments across model types, compare runs objectively, and maintain a full lineage from raw data to registered model
-* How Unity Catalog Model Registry works: versioning, aliases like `@champion`, and the governance layer that separates model development from deployment
-* How to expose a model as a governed REST endpoint using Model Serving and AI Gateway — including rate limiting, inference logging, and augmenting predictions with an LLM explanation
-
-### Session 2 — MLOps in Production (~2 hrs)
-
-
-| Step         | What they do                                                    | What they learn                                                                   |
-| -------------- | ----------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| CI/CD        | Review GitHub Actions + DABs job graph                          | How retraining pipelines are structured                                           |
-| Retrain      | Trigger retraining job via SDK                                  | Automated training pipelines, task graphs                                         |
-| Gate         | Observe deployment gate pass/fail scenarios                     | Quality thresholds block bad model promotions                                     |
-| A/B & canary | Configure 90/10 then 50/50 traffic split                        | Safe rollouts without downtime                                                    |
-| Inject drift | Run drift simulation (tenure shift, price increase, label flip) | How real-world distribution shift looks                                           |
-| Monitor      | Create Lakehouse Monitor, trigger refresh                       | Population Stability Index (PSI) drift detection, profile vs drift metrics tables |
-| Alert        | Create a DBSQL alert on drift metrics                           | Automated notification when drift exceeds threshold                               |
-| Incident     | Detect drift → diagnose → rollback → re-trigger retrain      | End-to-end incident response runbook                                              |
+| # | Module | Duration | Artifacts Created |
+|---|---|---|---|
+| 01 | `01_data_exploration` | 15 min | — (Genie Space query, visualizations) |
+| 02 | `02_messy_notebook` | 5 min *(instructor demo)* | — |
+| 03 | `03_refactored_pipeline` | 20 min | 1 MLflow run, trained sklearn pipeline |
+| 04 | `04_mlflow_experiment` | 25 min | Feature Store table `churn_features`, 3 MLflow runs, experiment |
+| 05 | `05_register_and_serve` | 25 min | UC model versions `@champion` + `@serving`, serving endpoint |
+| 06 | `06_llm_explanation` | 25 min | Personal prompt version in shared Prompt Registry |
+| 07 | `07_production_checklist` | 12 min | — (pytest + data quality check results) |
+|    | Total | 127 min | |
 
 **What participants leave with:**
+- How to structure ML code as a testable, reusable Python package rather than a monolithic notebook
+- How to use MLflow to track experiments, compare model types, and maintain lineage from raw data to registered model
+- How Unity Catalog Model Registry works: versioning, dual aliases (`@champion` for batch scoring, `@serving` for the endpoint), and governance
+- How to expose a model as a governed REST endpoint with AI Gateway rate limiting, inference logging, and an LLM-generated explanation pulled from a versioned Prompt Registry
 
-* How to automate the full retraining lifecycle with Databricks Jobs: scheduled runs, task dependencies, deployment gates that block underperforming models from reaching production
-* How to manage risk during model updates using canary deployments and A/B traffic splits — rolling forward safely and rolling back when something goes wrong
-* How Lakehouse Monitoring detects data drift using PSI, and how to wire it to automated DBSQL alerts so degradation triggers a response before users notice
-* How to run an end-to-end incident response: detect → diagnose → rollback → retrain — using only Databricks-native tooling throughout
+### Session 1 error-prone areas
+
+| Risk | Where | Mitigation |
+|---|---|---|
+| REST API cell runs before endpoint is ready | `05` — endpoint creation is async (~5-10 min spin-up) | Instruct participants to check Serving UI for "Ready" status before running the final REST cell |
+| `best_run_id` widget not populated | `05` — reads from prior task values or manual widget input | If running standalone (not via job), participants must copy the run ID from `04`'s output |
+| LLM gateway cold start | `06` — first call may take 30+ sec | Instructor starts the `01_keep_endpoint_warm notebook` before the workshop begins.  Don't for get to turn it off after the workshop! |
+| pip install adds cluster variance | `03`, `04`, `05`, `06` | Pre-installing the `churn_model` wheel in the cluster init script would eliminate this, but the current design is a teaching moment about options. |
+
+---
+
+## Session 2 — MLOps in Production (~2 hrs)
+
+> Session 2 opens with `07_production_checklist` from Session 1 as a 10-minute bridge: "here's what we built — here's what's still missing."
+
+| # | Module | Duration | Artifacts Created |
+|---|---|---|---|
+| — | `07_production_checklist` *(bridge)* | 10 min | — |
+| 01 | `01_cicd_overview` | 13 min | Deployed bundle, running retrain job (async) |
+| 02 | `02_simulate_drift` | 20 min | `telco_churn_new_training_data`, `churn_inference_log` |
+| 03 | `03_monitoring_setup` | 15 min | Lakehouse Monitor, `_profile_metrics` + `_drift_metrics` tables (async refresh) |
+| 04 | `04_drift_alerts` | 12 min | DBSQL alert on PSI threshold |
+| 05 | `05_trigger_retrain` | 10 min | Retrain job run (async, 10-15 min pipeline) |
+| 06 | `06_ab_canary_setup` | 15 min | — (reads live endpoint state; UI-driven traffic split) |
+| 07 | `07_incident_runbook` | 22 min *(bonus)* | Rolled-back endpoint config, retrain job run |
+| 08 | `08_client_deployment` | 18 min *(discussion)* | — |
+|    | Total | 125 min | |
+
+**What participants leave with:**
+- How to automate the full retraining lifecycle with Databricks Jobs: task dependencies, deployment gates that block underperforming models
+- How to manage risk during model updates using canary deployments and UI-driven traffic splits
+- How Lakehouse Monitoring detects data drift using PSI, and how to wire it to automated DBSQL alerts
+- How to run an end-to-end incident response: detect → diagnose → rollback → retrain using Databricks-native tooling
+
+### Session 2 error-prone areas
+
+| Risk | Where | Mitigation |
+|---|---|---|
+| `06_ab_canary_setup` reads stale endpoint state | Retrain job from `05` takes 10-15 min; `06` may open before it finishes | Add note: if only one model version is visible, wait 1-2 min and re-run the inspect cells |
+| `04_drift_alerts` runs before monitor refresh completes | Monitor refresh from `03` takes 5-10 min | Notebook warns participants; they can proceed and re-run the query cell once refresh is done |
+| Bundle deploy fails if DABs in Workspace not enabled | `01_cicd_overview` | Verify the feature is enabled in the workspace before the workshop |
+| Alert subscription UI path changes between DBR versions | `04_drift_alerts` — legacy SQL alerts UI | Test the subscription flow in the target workspace before the session |
 
 ---
 
 ## Repository Structure
 
 ```
-databricks.yml                        # Databricks Asset Bundle root
-resources/                            # DABs resource definitions
-├── training_job.yml
-├── retrain_job.yml
-└── monitoring_refresh_job.yml
 participant/
-├── session1/                         # Session 1 notebooks (00–06)
-├── session2/                         # Session 2 notebooks (01–08)
-├── common/config.yml                 # Shared config: catalog, features, hyperparams
-├── utils/config.ipynb                # Config loader
-└── asset_bundle/
-    ├── databricks.yml
-    ├── wheels/                       # churn_model package + tests
-    └── .github/workflows/            # CI/CD pipeline definitions
+├── session1/
+│   ├── 00_setup_participant.ipynb
+│   ├── 01_data_exploration.ipynb
+│   ├── 02_messy_notebook.ipynb         # instructor demo — do not run
+│   ├── 03_refactored_pipeline.ipynb
+│   ├── 04_mlflow_experiment.ipynb
+│   ├── 05_register_and_serve.ipynb
+│   ├── 06_llm_explanation.ipynb
+│   └── 07_production_checklist.ipynb   # also opens Session 2 as a bridge
+├── session2/
+│   ├── 01_cicd_overview.ipynb
+│   ├── 02_simulate_drift.ipynb
+│   ├── 03_monitoring_setup.ipynb
+│   ├── 04_drift_alerts.ipynb
+│   ├── 05_trigger_retrain.ipynb
+│   ├── 06_ab_canary_setup.ipynb
+│   ├── 07_incident_runbook.ipynb       # bonus — run if time allows
+│   └── 08_client_deployment.ipynb      # discussion / leave-behind
+├── utils/
+│   ├── config.ipynb                    # sets catalog, schema, safe_username, genie_space_id
+│   └── resources/                      # diagrams embedded in notebooks (PNG)
+└── bundle/
+    ├── databricks.yml                  # DAB root — schema auto-derived from current_user()
+    ├── resources/retrain_job.yml       # 5-task retrain pipeline definition
+    ├── wheels/                         # churn_model package source + tests
+    ├── jobs/                           # job task notebooks (00–04)
+    └── .github/workflows/             # GitHub Actions CI/CD definitions
 instructor/
-├── scripts/00_instructor_setup.ipynb # One-time workspace setup (instructor only)
-└── artifacts/                        # Source data and pre-built wheel
+├── scripts/00_instructor_setup.ipynb   # one-time workspace setup (workspace admin required)
+└── artifacts/                          # Telco-Customer-Churn.csv + pre-built wheel
 ```
-
-## Instructor setup
-
-1. Ensure the `platform-workshop` catalog exists in the target workspace
-2. Create Git Folder at root of SHARED workspace folder.
-3. Run `instructor/scripts/00_instructor_setup.ipynb` (requires WORKSPACE ADMIN)
-   - Creates shared schema and Volumes
-   - Load the Telco dataset
-   - Build and upload the `churn_model` wheel
-   - Grant permissions to `account users`
-4. Copy `SETUP-Production-ready-ML-workshop` to `/Workspace/shared/` in the workspace
-
-## Participant permissions required
-
-
-| Permission      | Resource                                 | Purpose                                                |
-| ----------------- | ------------------------------------------ | -------------------------------------------------------- |
-| `USE CATALOG`   | `workshop`                               | Access the catalog                                     |
-| `BROWSE`        | `workshop`                               | See catalog in Explorer                                |
-| `CREATE SCHEMA` | `workshop`                               | Participants create their own workshop.username schema |
-| `USE SCHEMA`    | `workshop.00_shared`                     | Access shared data                                     |
-| `SELECT`        | `workshop.00_shared.telco_churn`         | Read training data                                     |
-| `SELECT`        | `workshop.00_shared.telco_churn_holdout` | Read holdout data for evaluation                       |
-| `READ VOLUME`   | `workshop.00_shared.raw_files`           | Access raw CSV                                         |
-
-All granted via `GRANT ... TO 'account users'` in the instructor setup notebook.
-
-### Participant setup (run at the start of the workshop)
-
-Each participant opens `SETUP-Production-ready-ML-workshop.ipynb` from `/Workspace/shared` and runs all cells. This creates their personal schema and workspace artifacts.
 
 ---
 
-## Customer Churn Corpus
+## Instructor Setup
 
-Source: IBM's GitHub repo for their Cloud Pak for Data tutorials: https://raw.githubusercontent.com/IBM/telco-customer-churn-on-icp4d/master/data/Telco-Customer-Churn.csv
+Run `instructor/scripts/00_instructor_setup.ipynb` (requires workspace admin) before the workshop. The notebook is broken into numbered steps — run them in order:
 
-The IBM Telco Customer Churn dataset is a synthetic but realistic dataset originally published by IBM as a Watson Analytics sample. It's one of the most widely used demo datasets in the ML community — you'll find it in Databricks tutorials, Kaggle notebooks, scikit-learn examples, and countless blog posts.
+| Step | What it does |
+|---|---|
+| 1–2 | Set catalog, create `00_shared` schema |
+| 3–3b | Create UC Volumes, copy CSV and wheel |
+| 4 | Load `telco_churn` Delta table (7,043 rows) |
+| 5 | Create `telco_churn_holdout` (stratified 15% sample) |
+| 6 | Grant permissions to `account users` |
+| 7 | Create `foundation_model_with_gateway` serving endpoint with AI Gateway guardrails |
+| 8 | Register `churn_explainer` prompt `@production` in shared Prompt Registry |
+| 9 | Create shared Genie Space on `telco_churn`; prints `space_id` |
+
+After Step 9: paste the printed `space_id` into `participant/utils/config.ipynb` to replace the `genie_space_id` placeholder.
+
+---
+
+## Participant Permissions Required
+
+| Permission | Resource | Purpose |
+|---|---|---|
+| `USE CATALOG` | `workshop` | Access the catalog |
+| `BROWSE` | `workshop` | See catalog in Explorer |
+| `CREATE SCHEMA` | `workshop` | Participants create `workshop.<username>` |
+| `USE SCHEMA` | `workshop.00_shared` | Access shared data |
+| `SELECT` | `workshop.00_shared.telco_churn` | Read training data |
+| `SELECT` | `workshop.00_shared.telco_churn_holdout` | Read holdout data for deployment gate |
+| `READ VOLUME` | `workshop.00_shared.raw_files` | Access raw CSV |
+| `READ VOLUME` | `workshop.00_shared.wheels` | Install `churn_model` wheel |
+| `CAN_QUERY` | `foundation_model_with_gateway` endpoint | Call LLM from `06_llm_explanation` |
+
+All granted via `GRANT ... TO 'account users'` in the instructor setup notebook.
+
+---
+
+## Dataset
+
+**Source:** IBM Telco Customer Churn — [IBM GitHub](https://raw.githubusercontent.com/IBM/telco-customer-churn-on-icp4d/master/data/Telco-Customer-Churn.csv)
 
 - 7,043 customer records, 21 features + 1 binary target (Churn: Yes/No)
 - ~26% churn rate — moderately imbalanced
-- Features cover three areas:
-  - Demographics: gender, SeniorCitizen, Partner, Dependents
-  - Account: tenure, Contract, PaymentMethod, MonthlyCharges, TotalCharges
-  - Services: PhoneService, MultipleLines, InternetService, OnlineSecurity, OnlineBackup, DeviceProtection, TechSupport, StreamingTV, StreamingMovies
-- Known quirks (both of which we handle in the admin setup notebook):
-  - SeniorCitizen is 0/1 int while every other binary feature is "Yes"/"No" string
-  - 11 rows have an empty string for TotalCharges (customers with tenure = 0 who haven't been billed yet)
+- Features: demographics (gender, SeniorCitizen, Partner, Dependents), account (tenure, Contract, PaymentMethod, MonthlyCharges, TotalCharges), services (PhoneService, MultipleLines, InternetService, and 6 add-on services)
+- Known quirks handled in the setup notebook:
+  - `SeniorCitizen` is stored as `0`/`1` int; all other binary features are `"Yes"`/`"No"` strings
+  - 11 rows have an empty string for `TotalCharges` (new customers with `tenure = 0`)
 
 ---
 
 ## Data Architecture
 
-╔══ UNITY CATALOG: workshop.00_shared (shared · read-only for all participants) ════════╗
-║  ┌──────────────────────────────────────┐   ┌──────────────────────────────────────┐  ║
-║  │  telco_churn                         │   │  telco_churn_holdout                 │  ║
-║  │  7,043 rows · 21 features            │   │  ~1,056 rows · stratified 15%        │  ║
-║  │  Churn: Yes/No  (26% positive)       │   │  not used in any training exercise   │  ║
-║  └──────────────────┬───────────────────┘   └──────────────────┬───────────────────┘  ║
-╚═════════════════════╪══════════════════════════════════════════╪══════════════════════╝
-│ spark.table()                            │ (deployment gate only)
-╔══ SESSION 1: BUILD ═╪══════════════════════════════════════════╪═══════════════════════╗
-║                     ▼                                        ...                       ║
-║  ┌──────────────────────────────────────────────────────────────────────────────────┐  ║
-║  │  churn_model  (Python package · installed from UC Volume)                        │  ║
-║  │  features.py  ·  train.py  ·  evaluate.py  ·  data_quality.py                    │  ║
-║  └──────────────────────────────────────┬──────────────────────────────────────────-┘  ║
-║                                         │ run_training(data=df)                        ║
-║                                         ▼                                              ║
-║  ┌──────────────────────────────────────────────────────────────────────────────────┐  ║
-║  │  MLflow Experiment   workshop.<schema>.churn_experiment                          │  ║
-║  │                                                                                  │  ║
-║  │  ┌──────────────────┐   ┌───────────────────────┐   ┌──────────────────────┐     │  ║
-║  │  │  LogisticReg     │   │  RandomForest         │   │ GradientBoostedTrees │     │  ║
-║  │  │  F1 ≈ 0.55       │   │  F1 ≈ 0.62            │   │ F1 ≈ 0.65  ← best    │     │  ║
-║  │  └──────────────────┘   └───────────────────────┘   └──────────────────────┘     │  ║
-║  │  logs: params · metrics · confusion matrix · feature importance · model artifact │  ║
-║  └──────────────────────────────────────┬──────────────────────────────────────────-┘  ║
-║                                         │ mlflow.register_model()                      ║
-║                                         ▼                                              ║
-║  ┌──────────────────────────────────────────────────────────────────────────────────┐  ║
-║  │  UC Model Registry   workshop.<schema>.churn_classifier                          │  ║
-║  │  v1 · v2 · v3 · ...        @champion ──► points to best version                  │  ║
-║  └──────────────────────────────────────┬──────────────────────────────────────────-┘  ║
-║                                         │ w.serving_endpoints.create_and_wait()        ║
-║                                         ▼                                              ║
-║  ┌──────────────────────────────────────────────────────────────────────────────────┐  ║
-║  │  Model Serving + AI Gateway   churn-<schema>                                     │  ║
-║  │  rate limit: 60 req / min / user  ·  inference logging enabled                   │  ║
-║  │                                                                                  │  ║
-║  │   POST /serving-endpoints/churn-<schema>/invocations  ───────────────────────►   │  ║
-║  │                         │                                                        │  ║
-║  │              ┌──────────┴────────────────────────────────────┐                   │  ║
-║  │              ▼                                               ▼                   │  ║
-║  │   churn_payload                              Foundation Model API                │  ║
-║  │   AI Gateway inference log table             Llama 3.3 70B Instruct              │  ║
-║  │   request · response · model_id              → human-readable churn explanation  │  ║
-║  └──────────────────────────────────────────────────────────────────────────────────┘  ║
-╚════════════════════════════════════════════════════════════════════════════════════════╝
+```
+╔══ UNITY CATALOG: workshop.00_shared (shared · read-only) ══════════════════════════╗
+║  telco_churn  (7,043 rows)              telco_churn_holdout  (~1,056 rows)          ║
+║  training source for all sessions       deployment gate evaluation only             ║
+╚══════════════════════╤═════════════════════════════════════╤══════════════════════╝
+                       │ spark.table()                        │ (gate only)
+╔══ SESSION 1 ═════════╪══════════════════════════════════════╪══════════════════════╗
+║                      ▼                                      │                      ║
+║  churn_model  (Python package · installed from UC Volume)   │                      ║
+║  features.py · train.py · evaluate.py                       │                      ║
+║         │                                                   │                      ║
+║         │ fe.create_training_set() + run_all_models()       │                      ║
+║         ▼                                                   │                      ║
+║  Feature Store: workshop.<schema>.churn_features            │                      ║
+║  MLflow Experiment: /Users/<user>/churn_<schema>            │                      ║
+║    LogisticRegression · RandomForest · GradientBoostedTrees │                      ║
+║         │                                                   │                      ║
+║         │ mlflow.register_model()                           │                      ║
+║         ▼                                                   ▼                      ║
+║  UC Model Registry: workshop.<schema>.churn_classifier                             ║
+║    @champion  →  pyfunc (fe.score_batch)                                           ║
+║    @serving   →  sklearn pipeline (endpoint)                                       ║
+║         │                                                                          ║
+║         │ w.serving_endpoints.create()  [async — ~5-10 min spin-up]               ║
+║         ▼                                                                          ║
+║  Model Serving + AI Gateway: churn_<schema>                                        ║
+║    rate limit: 60 req/min/user · inference logging enabled                         ║
+║         │                                                                          ║
+║         ├──► REST prediction                                                       ║
+║         └──► Foundation Model API (Llama 3.3 70B) → churn explanation             ║
+║                    Prompt: workshop.00_shared.churn_explainer@production           ║
+╚════════════════════════════════════════════════════════════════════════════════════╝
 
-╔══ SESSION 2: OPERATE ══════════════════════════════════════════════════════════════════╗
-║                                                                                        ║
-║  ┌────────────────────────────────────────────────────────────────────────────────┐    ║
-║  │  Databricks Jobs (DABs)   workshop_retrain_churn                               │    ║
-║  │                                                                                │    ║
-║  │   GitHub push / schedule                                                       │    ║
-║  │          │                                                                     │    ║
-║  │          ▼                                                                     │    ║
-║  │   [train_models] ──► [deployment_gate] ──────────────► [update_champion]       │    ║
-║  │                              │              pass             │                 │    ║
-║  │                         F1 < threshold?              @champion alias           │    ║
-║  │                         block · notify               updated in UC             │    ║
-║  └────────────────────────────────────────────────────────────────────────────────┘    ║
-║                                                                                        ║
-║  ┌────────────────────────────────────────────────────────────────────────────────┐    ║
-║  │  Traffic Control   churn-<schema>                                              │    ║
-║  │                                                                                │    ║
-║  │  canary:   10% ──► @challenger        90% ──► @champion                        │    ║
-║  │  A/B test: 50% ──► @challenger        50% ──► @champion                        │    ║
-║  └────────────────────────────────────────────────────────────────────────────────┘    ║
-║                                                                                        ║
-║  05_simulate_drift.ipynb  (tenure shift · MonthlyCharges +$10 · label flip)            ║
-║         │                                                                              ║
-║         ▼                                                                              ║
-║  ┌────────────────────────────────────────────────────────────────────────────────┐    ║
-║  │  churn_inference_log        (workshop.<schema>)                                │    ║
-║  │  feature columns · prediction · model_id · inference_ts · Churn (ground truth) │    ║
-║  └─────────────────────────────────────┬──────────────────────────────────────────┘    ║
-║                                        │                                               ║
-║   churn_monitor_baseline  (view) ──────┤  compare feature distributions                ║
-║   telco_churn with typed columns       │                                               ║
-║                                        ▼                                               ║
-║  ┌────────────────────────────────────────────────────────────────────────────────┐    ║
-║  │  Lakehouse Monitor   on churn_inference_log                                    │    ║
-║  │  InferenceLog · daily granularity · PSI per feature                            │    ║
-║  │                                                                                │    ║
-║  │  ┌─────────────────────────────────┐  ┌──────────────────────────────────┐     │    ║
-║  │  │  _profile_metrics               │  │  _drift_metrics                  │     │    ║
-║  │  │  prediction distribution        │  │  PSI · tenure         ≈ 0.28     │     │    ║
-║  │  │  per-feature statistics         │  │  PSI · MonthlyCharges ≈ 0.12     │     │    ║
-║  │  └─────────────────────────────────┘  └──────────────────┬───────────────┘     │    ║
-║  └──────────────────────────────────────────────────────────┼─────────────────────┘    ║
-║                                                              │ PSI > 0.2 threshold     ║
-║                                                              ▼                         ║
-║  ┌────────────────────────────────────────────────────────────────────────────────┐    ║
-║  │  DBSQL Alert  →  notification  →  Incident Runbook                             │    ║
-║  │  diagnose drift  →  rollback @champion  →  re-trigger retrain job              │    ║
-║  └────────────────────────────────────────────────────────────────────────────────┘    ║
-╚════════════════════════════════════════════════════════════════════════════════════════╝
+╔══ SESSION 2 ═══════════════════════════════════════════════════════════════════════╗
+║                                                                                    ║
+║  DAB: bundle/databricks.yml  →  workshop_retrain_churn (Lakeflow Job)             ║
+║    feature_engineering → ingest_and_validate → train_models                       ║
+║                       → gate_and_register (F1 gate ±5%)                           ║
+║                       → update_endpoint (90/10 canary)                            ║
+║    schema auto-derived from current_user() — no manual variable override needed   ║
+║                                                                                    ║
+║  02_simulate_drift:                                                                ║
+║    telco_churn_new_training_data  (tenure shift · price increase · label flip)     ║
+║    churn_inference_log            (simulated predictions with ground truth)        ║
+║         │                                                                          ║
+║         ▼                                                                          ║
+║  Lakehouse Monitor on churn_inference_log                                          ║
+║    _profile_metrics · _drift_metrics  (PSI per feature · async refresh)           ║
+║         │                                                                          ║
+║         │ PSI > 0.2                                                                ║
+║         ▼                                                                          ║
+║  DBSQL Alert → notification → Incident Runbook                                     ║
+║    detect → diagnose → rollback @champion → re-trigger retrain                    ║
+╚════════════════════════════════════════════════════════════════════════════════════╝
+```
