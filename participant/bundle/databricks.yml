@@ -58,7 +58,7 @@ targets:
     default: true
     variables:
       catalog: "vectorcatalog02"
-      schema: "my-schema"
+      schema: ""          # leave blank — each job task derives schema from current_user()
 
 
   # ---------------------------------------------------------------------------

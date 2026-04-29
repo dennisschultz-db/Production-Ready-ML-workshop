@@ -1,0 +1,2368 @@
+{
+  "datasets": [
+    {
+      "name": "dataset1",
+      "displayName": "telco_churn",
+      "queryLines": [
+        "SELECT * FROM vectorcatalog02.`00_shared`.telco_churn"
+      ],
+      "columns": [
+        {
+          "displayName": "Churn Rate",
+          "description": "Percentage of customers who churned",
+          "expression": "SUM(CASE WHEN `Churn` = 'Yes' THEN 1 ELSE 0 END) * 1.0 / COUNT(`*`)"
+        },
+        {
+          "displayName": "Churned Customers",
+          "description": "Count of customers who churned",
+          "expression": "SUM(CASE WHEN `Churn` = 'Yes' THEN 1 ELSE 0 END)"
+        },
+        {
+          "displayName": "Tenure Bucket",
+          "description": "Tenure grouped into buckets",
+          "expression": "CASE WHEN `tenure` <= 12 THEN '0-12 mo' WHEN `tenure` <= 24 THEN '13-24 mo' WHEN `tenure` <= 48 THEN '25-48 mo' ELSE '49-72 mo' END"
+        },
+        {
+          "displayName": "Senior Citizen Label",
+          "description": "Friendly label for SeniorCitizen flag",
+          "expression": "CASE WHEN `SeniorCitizen` = 1 THEN 'Senior' ELSE 'Non-Senior' END"
+        }
+      ]
+    },
+    {
+      "name": "services_unpivot",
+      "displayName": "Services Unpivoted",
+      "queryLines": [
+        "SELECT\n",
+        "  customerID,\n",
+        "  Churn,\n",
+        "  InternetService,\n",
+        "  Contract,\n",
+        "  tenure,\n",
+        "  MonthlyCharges,\n",
+        "  Service,\n",
+        "  Status\n",
+        "FROM\n",
+        "  vectorcatalog02.`00_shared`.telco_churn\n",
+        "    UNPIVOT (\n",
+        "      Status FOR Service IN (\n",
+        "        OnlineSecurity,\n",
+        "        OnlineBackup,\n",
+        "        DeviceProtection,\n",
+        "        TechSupport,\n",
+        "        StreamingTV,\n",
+        "        StreamingMovies,\n",
+        "        MultipleLines\n",
+        "      )\n",
+        "    )"
+      ],
+      "columns": [
+        {
+          "displayName": "Service Name",
+          "description": "Friendly service name",
+          "expression": "CASE WHEN `Service` = 'OnlineSecurity' THEN 'Online Security' WHEN `Service` = 'OnlineBackup' THEN 'Online Backup' WHEN `Service` = 'DeviceProtection' THEN 'Device Protection' WHEN `Service` = 'TechSupport' THEN 'Tech Support' WHEN `Service` = 'StreamingTV' THEN 'Streaming TV' WHEN `Service` = 'StreamingMovies' THEN 'Streaming Movies' WHEN `Service` = 'MultipleLines' THEN 'Multiple Lines' ELSE `Service` END"
+        },
+        {
+          "displayName": "Service Category",
+          "description": "Groups services into Protection, Entertainment, Communication",
+          "expression": "CASE WHEN `Service` IN ('OnlineSecurity', 'OnlineBackup', 'DeviceProtection', 'TechSupport') THEN 'Protection' WHEN `Service` IN ('StreamingTV', 'StreamingMovies') THEN 'Entertainment' ELSE 'Communication' END"
+        },
+        {
+          "displayName": "Churn Rate",
+          "description": "Churn rate for service groupings",
+          "expression": "SUM(CASE WHEN `Churn` = 'Yes' THEN 1 ELSE 0 END) * 1.0 / COUNT(`*`)"
+        }
+      ]
+    },
+    {
+      "name": "services_summary",
+      "displayName": "Services Summary",
+      "queryLines": [
+        "SELECT\n",
+        "  CASE\n",
+        "    WHEN Service = 'OnlineSecurity' THEN 'Online Security'\n",
+        "    WHEN Service = 'OnlineBackup' THEN 'Online Backup'\n",
+        "    WHEN Service = 'DeviceProtection' THEN 'Device Protection'\n",
+        "    WHEN Service = 'TechSupport' THEN 'Tech Support'\n",
+        "    WHEN Service = 'StreamingTV' THEN 'Streaming TV'\n",
+        "    WHEN Service = 'StreamingMovies' THEN 'Streaming Movies'\n",
+        "    WHEN Service = 'MultipleLines' THEN 'Multiple Lines'\n",
+        "    ELSE Service\n",
+        "  END AS ServiceName,\n",
+        "  Status,\n",
+        "  COUNT(*) AS Customers,\n",
+        "  ROUND(\n",
+        "    SUM(\n",
+        "      CASE\n",
+        "        WHEN Churn = 'Yes' THEN 1\n",
+        "        ELSE 0\n",
+        "      END\n",
+        "    )\n",
+        "      * 100.0\n",
+        "      / COUNT(*),\n",
+        "    1\n",
+        "  ) AS ChurnRatePct\n",
+        "FROM\n",
+        "  vectorcatalog02.`00_shared`.telco_churn\n",
+        "    UNPIVOT (\n",
+        "      Status FOR Service IN (\n",
+        "        OnlineSecurity,\n",
+        "        OnlineBackup,\n",
+        "        DeviceProtection,\n",
+        "        TechSupport,\n",
+        "        StreamingTV,\n",
+        "        StreamingMovies,\n",
+        "        MultipleLines\n",
+        "      )\n",
+        "    )\n",
+        "GROUP BY\n",
+        "  Service,\n",
+        "  Status\n",
+        "ORDER BY\n",
+        "  Service,\n",
+        "  Status"
+      ]
+    }
+  ],
+  "pages": [
+    {
+      "name": "page1",
+      "displayName": "Overview",
+      "layout": [
+        {
+          "widget": {
+            "name": "text_box1",
+            "multilineTextboxSpec": {
+              "lines": [
+                "## Telco Churn Insights\n",
+                "Interactive analysis of customer churn drivers across contract types, services, billing, and demographics."
+              ]
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 12,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "table1",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "dataset1",
+                  "fields": [
+                    {
+                      "name": "customerID",
+                      "expression": "`customerID`"
+                    },
+                    {
+                      "name": "Churn",
+                      "expression": "`Churn`"
+                    },
+                    {
+                      "name": "Contract",
+                      "expression": "`Contract`"
+                    },
+                    {
+                      "name": "InternetService",
+                      "expression": "`InternetService`"
+                    },
+                    {
+                      "name": "tenure",
+                      "expression": "`tenure`"
+                    },
+                    {
+                      "name": "MonthlyCharges",
+                      "expression": "`MonthlyCharges`"
+                    },
+                    {
+                      "name": "TotalCharges",
+                      "expression": "`TotalCharges`"
+                    },
+                    {
+                      "name": "PaymentMethod",
+                      "expression": "`PaymentMethod`"
+                    },
+                    {
+                      "name": "gender",
+                      "expression": "`gender`"
+                    },
+                    {
+                      "name": "SeniorCitizen",
+                      "expression": "`SeniorCitizen`"
+                    },
+                    {
+                      "name": "Partner",
+                      "expression": "`Partner`"
+                    },
+                    {
+                      "name": "Dependents",
+                      "expression": "`Dependents`"
+                    },
+                    {
+                      "name": "PhoneService",
+                      "expression": "`PhoneService`"
+                    },
+                    {
+                      "name": "TechSupport",
+                      "expression": "`TechSupport`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Customer Detail",
+                "showTitle": true
+              },
+              "rowsPerPage": 25,
+              "widgetType": "table",
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "customerID",
+                    "displayName": "Customer ID"
+                  },
+                  {
+                    "fieldName": "Churn",
+                    "displayName": "Churn",
+                    "style": {
+                      "type": "basic",
+                      "rules": [
+                        {
+                          "condition": {
+                            "operand": {
+                              "type": "data-value",
+                              "value": "Yes"
+                            },
+                            "operator": "="
+                          },
+                          "backgroundColor": "#FDECEC",
+                          "foregroundColor": "#E45756"
+                        },
+                        {
+                          "condition": {
+                            "operand": {
+                              "type": "data-value",
+                              "value": "No"
+                            },
+                            "operator": "="
+                          },
+                          "backgroundColor": "#EBF3FA",
+                          "foregroundColor": "#4C78A8"
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "fieldName": "Contract",
+                    "displayName": "Contract"
+                  },
+                  {
+                    "fieldName": "InternetService",
+                    "displayName": "Internet Service"
+                  },
+                  {
+                    "fieldName": "tenure",
+                    "displayName": "Tenure"
+                  },
+                  {
+                    "fieldName": "MonthlyCharges",
+                    "displayName": "Monthly Charges"
+                  },
+                  {
+                    "fieldName": "TotalCharges",
+                    "displayName": "Total Charges"
+                  },
+                  {
+                    "fieldName": "PaymentMethod",
+                    "displayName": "Payment Method"
+                  },
+                  {
+                    "fieldName": "gender",
+                    "displayName": "Gender"
+                  },
+                  {
+                    "fieldName": "SeniorCitizen",
+                    "displayName": "Senior Citizen"
+                  },
+                  {
+                    "fieldName": "Partner",
+                    "displayName": "Partner"
+                  },
+                  {
+                    "fieldName": "Dependents",
+                    "displayName": "Dependents"
+                  },
+                  {
+                    "fieldName": "PhoneService",
+                    "displayName": "Phone Service"
+                  },
+                  {
+                    "fieldName": "TechSupport",
+                    "displayName": "Tech Support"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 19,
+            "width": 12,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "counter_total",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "dataset1",
+                  "fields": [
+                    {
+                      "name": "count(customerID)",
+                      "expression": "COUNT(`customerID`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Total Customers",
+                "showTitle": true
+              },
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "count(customerID)",
+                  "displayName": "Total Customers"
+                }
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 2,
+            "width": 3,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "counter_churned",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "dataset1",
+                  "fields": [
+                    {
+                      "name": "measure(Churned Customers)",
+                      "expression": "MEASURE(`Churned Customers`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Churned Customers",
+                "showTitle": true
+              },
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "measure(Churned Customers)",
+                  "displayName": "Churned Customers"
+                }
+              }
+            }
+          },
+          "position": {
+            "x": 3,
+            "y": 2,
+            "width": 3,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "counter_churn_rate",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "dataset1",
+                  "fields": [
+                    {
+                      "name": "measure(Churn Rate)",
+                      "expression": "MEASURE(`Churn Rate`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Churn Rate",
+                "showTitle": true
+              },
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "measure(Churn Rate)",
+                  "format": {
+                    "type": "number-percent",
+                    "decimalPlaces": {
+                      "type": "exact",
+                      "places": 1
+                    }
+                  },
+                  "displayName": "Churn Rate"
+                }
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 2,
+            "width": 3,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "counter_avg_charges",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "dataset1",
+                  "fields": [
+                    {
+                      "name": "avg(MonthlyCharges)",
+                      "expression": "AVG(`MonthlyCharges`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Avg Monthly Charges",
+                "showTitle": true
+              },
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "avg(MonthlyCharges)",
+                  "format": {
+                    "type": "number-currency",
+                    "currencyCode": "USD",
+                    "decimalPlaces": {
+                      "type": "exact",
+                      "places": 2
+                    },
+                    "abbreviation": "none"
+                  },
+                  "displayName": "Avg Monthly Charges"
+                }
+              }
+            }
+          },
+          "position": {
+            "x": 9,
+            "y": 2,
+            "width": 3,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "bar_contract",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "dataset1",
+                  "fields": [
+                    {
+                      "name": "Churn",
+                      "expression": "`Churn`"
+                    },
+                    {
+                      "name": "Contract",
+                      "expression": "`Contract`"
+                    },
+                    {
+                      "name": "count(customerID)",
+                      "expression": "COUNT(`customerID`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "frame": {
+                "title": "Churn by Contract Type",
+                "showTitle": true
+              },
+              "mark": {
+                "layout": "stack"
+              },
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "Contract",
+                  "axis": {
+                    "hideTitle": true
+                  },
+                  "displayName": "Contract",
+                  "scale": {
+                    "type": "categorical",
+                    "sort": {
+                      "by": "y-reversed"
+                    }
+                  }
+                },
+                "y": {
+                  "fieldName": "count(customerID)",
+                  "displayName": "Customers",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "Churn",
+                  "legend": {
+                    "position": "bottom"
+                  },
+                  "displayName": "Churn",
+                  "scale": {
+                    "type": "categorical",
+                    "mappings": [
+                      {
+                        "value": "Yes",
+                        "color": "#E45756"
+                      },
+                      {
+                        "value": "No",
+                        "color": "#4C78A8"
+                      }
+                    ]
+                  }
+                },
+                "label": {
+                  "show": true
+                }
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 5,
+            "width": 4,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "bar_internet",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "dataset1",
+                  "fields": [
+                    {
+                      "name": "Churn",
+                      "expression": "`Churn`"
+                    },
+                    {
+                      "name": "InternetService",
+                      "expression": "`InternetService`"
+                    },
+                    {
+                      "name": "count(customerID)",
+                      "expression": "COUNT(`customerID`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "frame": {
+                "title": "Churn by Internet Service",
+                "showTitle": true
+              },
+              "mark": {
+                "layout": "stack"
+              },
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "InternetService",
+                  "axis": {
+                    "hideTitle": true
+                  },
+                  "displayName": "Internet Service",
+                  "scale": {
+                    "type": "categorical",
+                    "sort": {
+                      "by": "y-reversed"
+                    }
+                  }
+                },
+                "y": {
+                  "fieldName": "count(customerID)",
+                  "displayName": "Customers",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "Churn",
+                  "legend": {
+                    "position": "bottom"
+                  },
+                  "displayName": "Churn",
+                  "scale": {
+                    "type": "categorical",
+                    "mappings": [
+                      {
+                        "value": "Yes",
+                        "color": "#E45756"
+                      },
+                      {
+                        "value": "No",
+                        "color": "#4C78A8"
+                      }
+                    ]
+                  }
+                },
+                "label": {
+                  "show": true
+                }
+              }
+            }
+          },
+          "position": {
+            "x": 4,
+            "y": 5,
+            "width": 4,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "bar_payment",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "dataset1",
+                  "fields": [
+                    {
+                      "name": "Churn",
+                      "expression": "`Churn`"
+                    },
+                    {
+                      "name": "PaymentMethod",
+                      "expression": "`PaymentMethod`"
+                    },
+                    {
+                      "name": "count(customerID)",
+                      "expression": "COUNT(`customerID`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "frame": {
+                "title": "Churn by Payment Method",
+                "showTitle": true
+              },
+              "mark": {
+                "layout": "stack"
+              },
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "PaymentMethod",
+                  "axis": {
+                    "hideTitle": true
+                  },
+                  "displayName": "Payment Method",
+                  "scale": {
+                    "type": "categorical",
+                    "sort": {
+                      "by": "y-reversed"
+                    }
+                  }
+                },
+                "y": {
+                  "fieldName": "count(customerID)",
+                  "displayName": "Customers",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "Churn",
+                  "legend": {
+                    "position": "bottom"
+                  },
+                  "displayName": "Churn",
+                  "scale": {
+                    "type": "categorical",
+                    "mappings": [
+                      {
+                        "value": "Yes",
+                        "color": "#E45756"
+                      },
+                      {
+                        "value": "No",
+                        "color": "#4C78A8"
+                      }
+                    ]
+                  }
+                },
+                "label": {
+                  "show": true
+                }
+              }
+            }
+          },
+          "position": {
+            "x": 8,
+            "y": 5,
+            "width": 4,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "bar_tenure",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "dataset1",
+                  "fields": [
+                    {
+                      "name": "Tenure Bucket",
+                      "expression": "`Tenure Bucket`"
+                    },
+                    {
+                      "name": "measure(Churn Rate)",
+                      "expression": "MEASURE(`Churn Rate`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "frame": {
+                "title": "Churn Rate by Tenure",
+                "showTitle": true
+              },
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "Tenure Bucket",
+                  "axis": {
+                    "hideTitle": true
+                  },
+                  "displayName": "Tenure Bucket",
+                  "scale": {
+                    "type": "categorical",
+                    "sort": {
+                      "by": "custom-order",
+                      "orderedValues": [
+                        "0-12 mo",
+                        "13-24 mo",
+                        "25-48 mo",
+                        "49-72 mo"
+                      ]
+                    }
+                  }
+                },
+                "y": {
+                  "fieldName": "measure(Churn Rate)",
+                  "format": {
+                    "type": "number-percent",
+                    "decimalPlaces": {
+                      "type": "exact",
+                      "places": 1
+                    }
+                  },
+                  "displayName": "Churn Rate",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "Tenure Bucket",
+                  "legend": {
+                    "hide": true
+                  },
+                  "displayName": "Tenure Bucket",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "label": {
+                  "show": true
+                }
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 11,
+            "width": 6,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "hist_charges",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "dataset1",
+                  "fields": [
+                    {
+                      "name": "Churn",
+                      "expression": "`Churn`"
+                    },
+                    {
+                      "name": "MonthlyCharges",
+                      "expression": "`MonthlyCharges`"
+                    },
+                    {
+                      "name": "count(customerID)",
+                      "expression": "COUNT(`customerID`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "frame": {
+                "title": "Monthly Charges by Churn Status",
+                "showTitle": true
+              },
+              "widgetType": "histogram",
+              "encodings": {
+                "x": {
+                  "fieldName": "MonthlyCharges",
+                  "displayName": "Monthly Charges",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "y": {
+                  "fieldName": "count(customerID)",
+                  "displayName": "Customers",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "Churn",
+                  "legend": {
+                    "position": "bottom"
+                  },
+                  "displayName": "Churn",
+                  "scale": {
+                    "type": "categorical",
+                    "mappings": [
+                      {
+                        "value": "Yes",
+                        "color": "#E45756"
+                      },
+                      {
+                        "value": "No",
+                        "color": "#4C78A8"
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 11,
+            "width": 6,
+            "height": 6
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_CANVAS",
+      "layoutVersion": "GRID_V1"
+    },
+    {
+      "name": "demographics",
+      "displayName": "Demographics",
+      "layout": [
+        {
+          "widget": {
+            "name": "title",
+            "multilineTextboxSpec": {
+              "lines": [
+                "## Demographics & Churn\n",
+                "How gender, age, partner status, and dependents relate to customer churn."
+              ]
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 12,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "pie_gender",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "dataset1",
+                  "fields": [
+                    {
+                      "name": "count(customerID)",
+                      "expression": "COUNT(`customerID`)"
+                    },
+                    {
+                      "name": "gender",
+                      "expression": "`gender`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "frame": {
+                "title": "Customers by Gender",
+                "showTitle": true
+              },
+              "widgetType": "pie",
+              "encodings": {
+                "angle": {
+                  "fieldName": "count(customerID)",
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "displayName": "Customers"
+                },
+                "color": {
+                  "fieldName": "gender",
+                  "legend": {
+                    "position": "bottom"
+                  },
+                  "displayName": "Gender",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "label": {
+                  "show": true
+                }
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 2,
+            "width": 4,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "pie_senior",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "dataset1",
+                  "fields": [
+                    {
+                      "name": "count(customerID)",
+                      "expression": "COUNT(`customerID`)"
+                    },
+                    {
+                      "name": "Senior Citizen Label",
+                      "expression": "`Senior Citizen Label`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "frame": {
+                "title": "Customers by Senior Status",
+                "showTitle": true
+              },
+              "widgetType": "pie",
+              "encodings": {
+                "angle": {
+                  "fieldName": "count(customerID)",
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "displayName": "Customers"
+                },
+                "color": {
+                  "fieldName": "Senior Citizen Label",
+                  "legend": {
+                    "position": "bottom"
+                  },
+                  "displayName": "Senior Status",
+                  "scale": {
+                    "type": "categorical",
+                    "mappings": [
+                      {
+                        "value": "Senior",
+                        "color": "#E45756"
+                      },
+                      {
+                        "value": "Non-Senior",
+                        "color": "#4C78A8"
+                      }
+                    ]
+                  }
+                },
+                "label": {
+                  "show": true
+                }
+              }
+            }
+          },
+          "position": {
+            "x": 4,
+            "y": 2,
+            "width": 4,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "bar_partner_dep",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "dataset1",
+                  "fields": [
+                    {
+                      "name": "Dependents",
+                      "expression": "`Dependents`"
+                    },
+                    {
+                      "name": "Partner",
+                      "expression": "`Partner`"
+                    },
+                    {
+                      "name": "measure(Churn Rate)",
+                      "expression": "MEASURE(`Churn Rate`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "frame": {
+                "title": "Churn Rate: Partner & Dependents",
+                "showTitle": true
+              },
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "Partner",
+                  "displayName": "Partner",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fieldName": "measure(Churn Rate)",
+                  "format": {
+                    "type": "number-percent",
+                    "decimalPlaces": {
+                      "type": "exact",
+                      "places": 1
+                    }
+                  },
+                  "displayName": "Churn Rate",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "Dependents",
+                  "legend": {
+                    "position": "bottom"
+                  },
+                  "displayName": "Dependents",
+                  "scale": {
+                    "type": "categorical",
+                    "mappings": [
+                      {
+                        "value": "Yes",
+                        "color": "#59A14F"
+                      },
+                      {
+                        "value": "No",
+                        "color": "#E15759"
+                      }
+                    ]
+                  }
+                },
+                "label": {
+                  "show": true
+                }
+              }
+            }
+          },
+          "position": {
+            "x": 8,
+            "y": 2,
+            "width": 4,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "bar_gender_churn",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "dataset1",
+                  "fields": [
+                    {
+                      "name": "Churn",
+                      "expression": "`Churn`"
+                    },
+                    {
+                      "name": "gender",
+                      "expression": "`gender`"
+                    },
+                    {
+                      "name": "count(customerID)",
+                      "expression": "COUNT(`customerID`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "frame": {
+                "title": "Churn by Gender",
+                "showTitle": true
+              },
+              "mark": {
+                "layout": "stack"
+              },
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "gender",
+                  "axis": {
+                    "hideTitle": true
+                  },
+                  "displayName": "Gender",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fieldName": "count(customerID)",
+                  "displayName": "Customers",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "Churn",
+                  "legend": {
+                    "position": "bottom"
+                  },
+                  "displayName": "Churn",
+                  "scale": {
+                    "type": "categorical",
+                    "mappings": [
+                      {
+                        "value": "Yes",
+                        "color": "#E45756"
+                      },
+                      {
+                        "value": "No",
+                        "color": "#4C78A8"
+                      }
+                    ]
+                  }
+                },
+                "label": {
+                  "show": true
+                }
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 8,
+            "width": 4,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "bar_senior_churn",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "dataset1",
+                  "fields": [
+                    {
+                      "name": "Churn",
+                      "expression": "`Churn`"
+                    },
+                    {
+                      "name": "Senior Citizen Label",
+                      "expression": "`Senior Citizen Label`"
+                    },
+                    {
+                      "name": "count(customerID)",
+                      "expression": "COUNT(`customerID`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "frame": {
+                "title": "Churn by Senior Status",
+                "showTitle": true
+              },
+              "mark": {
+                "layout": "stack"
+              },
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "Senior Citizen Label",
+                  "axis": {
+                    "hideTitle": true
+                  },
+                  "displayName": "Senior Status",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fieldName": "count(customerID)",
+                  "displayName": "Customers",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "Churn",
+                  "legend": {
+                    "position": "bottom"
+                  },
+                  "displayName": "Churn",
+                  "scale": {
+                    "type": "categorical",
+                    "mappings": [
+                      {
+                        "value": "Yes",
+                        "color": "#E45756"
+                      },
+                      {
+                        "value": "No",
+                        "color": "#4C78A8"
+                      }
+                    ]
+                  }
+                },
+                "label": {
+                  "show": true
+                }
+              }
+            }
+          },
+          "position": {
+            "x": 4,
+            "y": 8,
+            "width": 4,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "bar_dep_churn",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "dataset1",
+                  "fields": [
+                    {
+                      "name": "Churn",
+                      "expression": "`Churn`"
+                    },
+                    {
+                      "name": "Dependents",
+                      "expression": "`Dependents`"
+                    },
+                    {
+                      "name": "count(customerID)",
+                      "expression": "COUNT(`customerID`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "frame": {
+                "title": "Churn by Dependents",
+                "showTitle": true
+              },
+              "mark": {
+                "layout": "stack"
+              },
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "Dependents",
+                  "axis": {
+                    "hideTitle": true
+                  },
+                  "displayName": "Dependents",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fieldName": "count(customerID)",
+                  "displayName": "Customers",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "Churn",
+                  "legend": {
+                    "position": "bottom"
+                  },
+                  "displayName": "Churn",
+                  "scale": {
+                    "type": "categorical",
+                    "mappings": [
+                      {
+                        "value": "Yes",
+                        "color": "#E45756"
+                      },
+                      {
+                        "value": "No",
+                        "color": "#4C78A8"
+                      }
+                    ]
+                  }
+                },
+                "label": {
+                  "show": true
+                }
+              }
+            }
+          },
+          "position": {
+            "x": 8,
+            "y": 8,
+            "width": 4,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "pivot_demo",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "dataset1",
+                  "fields": [
+                    {
+                      "name": "Senior Citizen Label",
+                      "expression": "`Senior Citizen Label`"
+                    },
+                    {
+                      "name": "Partner",
+                      "expression": "`Partner`"
+                    },
+                    {
+                      "name": "gender",
+                      "expression": "`gender`"
+                    },
+                    {
+                      "name": "count(customerID)",
+                      "expression": "COUNT(`customerID`)"
+                    },
+                    {
+                      "name": "measure(Churn Rate)",
+                      "expression": "MEASURE(`Churn Rate`)"
+                    }
+                  ],
+                  "cubeGroupingSets": {
+                    "sets": [
+                      {
+                        "fieldNames": [
+                          "Senior Citizen Label",
+                          "Partner"
+                        ]
+                      },
+                      {
+                        "fieldNames": [
+                          "gender"
+                        ]
+                      }
+                    ]
+                  },
+                  "disaggregated": false,
+                  "orders": [
+                    {
+                      "direction": "ASC",
+                      "expression": "`Senior Citizen Label`"
+                    },
+                    {
+                      "direction": "ASC",
+                      "expression": "`Partner`"
+                    },
+                    {
+                      "direction": "ASC",
+                      "expression": "`gender`"
+                    }
+                  ]
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "frame": {
+                "title": "Churn Rate by Demographics",
+                "showTitle": true
+              },
+              "widgetType": "pivot",
+              "encodings": {
+                "rows": [
+                  {
+                    "fieldName": "Senior Citizen Label",
+                    "displayTotal": true,
+                    "displayName": "Senior Status"
+                  },
+                  {
+                    "fieldName": "Partner",
+                    "displayTotal": true,
+                    "displayName": "Partner"
+                  }
+                ],
+                "columns": [
+                  {
+                    "fieldName": "gender",
+                    "displayTotal": true,
+                    "displayName": "Gender"
+                  }
+                ],
+                "cell": {
+                  "type": "multi-cell",
+                  "fields": [
+                    {
+                      "fieldName": "count(customerID)",
+                      "cellType": "text",
+                      "displayName": "Customers"
+                    },
+                    {
+                      "fieldName": "measure(Churn Rate)",
+                      "cellType": "text",
+                      "displayName": "Churn Rate",
+                      "style": {
+                        "type": "color-scale",
+                        "backgroundColor": {
+                          "scale": {
+                            "type": "quantitative",
+                            "colorRamp": {
+                              "mode": "scheme",
+                              "scheme": "redyellowgreen"
+                            },
+                            "reverse": true
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 14,
+            "width": 12,
+            "height": 6
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_CANVAS",
+      "layoutVersion": "GRID_V1"
+    },
+    {
+      "name": "global_filters",
+      "displayName": "Global Filters",
+      "layout": [
+        {
+          "widget": {
+            "name": "gf_contract",
+            "queries": [
+              {
+                "name": "dashboards/01f14179528c19aa8e30ab0726e08a1b/datasets/01f14179528c1a67a23127b1af1c508f_Contract",
+                "query": {
+                  "datasetName": "dataset1",
+                  "fields": [
+                    {
+                      "name": "Contract",
+                      "expression": "`Contract`"
+                    },
+                    {
+                      "name": "Contract_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "dashboards/01f14179528c19aa8e30ab0726e08a1b/datasets/01f1419a2bcb11bb80045d3b79b4150c_Contract",
+                "query": {
+                  "datasetName": "services_unpivot",
+                  "fields": [
+                    {
+                      "name": "Contract",
+                      "expression": "`Contract`"
+                    },
+                    {
+                      "name": "Contract_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Contract",
+                "showTitle": true
+              },
+              "widgetType": "filter-multi-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "Contract",
+                    "queryName": "dashboards/01f14179528c19aa8e30ab0726e08a1b/datasets/01f14179528c1a67a23127b1af1c508f_Contract"
+                  },
+                  {
+                    "fieldName": "Contract",
+                    "queryName": "dashboards/01f14179528c19aa8e30ab0726e08a1b/datasets/01f1419a2bcb11bb80045d3b79b4150c_Contract"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 3,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "gf_internet",
+            "queries": [
+              {
+                "name": "dashboards/01f14179528c19aa8e30ab0726e08a1b/datasets/01f14179528c1a67a23127b1af1c508f_InternetService",
+                "query": {
+                  "datasetName": "dataset1",
+                  "fields": [
+                    {
+                      "name": "InternetService",
+                      "expression": "`InternetService`"
+                    },
+                    {
+                      "name": "InternetService_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "dashboards/01f14179528c19aa8e30ab0726e08a1b/datasets/01f1419a2bcb11bb80045d3b79b4150c_InternetService",
+                "query": {
+                  "datasetName": "services_unpivot",
+                  "fields": [
+                    {
+                      "name": "InternetService",
+                      "expression": "`InternetService`"
+                    },
+                    {
+                      "name": "InternetService_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Internet Service",
+                "showTitle": true
+              },
+              "widgetType": "filter-multi-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "InternetService",
+                    "queryName": "dashboards/01f14179528c19aa8e30ab0726e08a1b/datasets/01f14179528c1a67a23127b1af1c508f_InternetService"
+                  },
+                  {
+                    "fieldName": "InternetService",
+                    "queryName": "dashboards/01f14179528c19aa8e30ab0726e08a1b/datasets/01f1419a2bcb11bb80045d3b79b4150c_InternetService"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 3,
+            "y": 0,
+            "width": 3,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "gf_churn",
+            "queries": [
+              {
+                "name": "dashboards/01f14179528c19aa8e30ab0726e08a1b/datasets/01f14179528c1a67a23127b1af1c508f_Churn",
+                "query": {
+                  "datasetName": "dataset1",
+                  "fields": [
+                    {
+                      "name": "Churn",
+                      "expression": "`Churn`"
+                    },
+                    {
+                      "name": "Churn_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "dashboards/01f14179528c19aa8e30ab0726e08a1b/datasets/01f1419a2bcb11bb80045d3b79b4150c_Churn",
+                "query": {
+                  "datasetName": "services_unpivot",
+                  "fields": [
+                    {
+                      "name": "Churn",
+                      "expression": "`Churn`"
+                    },
+                    {
+                      "name": "Churn_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Churn",
+                "showTitle": true
+              },
+              "widgetType": "filter-single-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "Churn",
+                    "queryName": "dashboards/01f14179528c19aa8e30ab0726e08a1b/datasets/01f14179528c1a67a23127b1af1c508f_Churn"
+                  },
+                  {
+                    "fieldName": "Churn",
+                    "queryName": "dashboards/01f14179528c19aa8e30ab0726e08a1b/datasets/01f1419a2bcb11bb80045d3b79b4150c_Churn"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 0,
+            "width": 3,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "gf_gender",
+            "queries": [
+              {
+                "name": "dashboards/01f14179528c19aa8e30ab0726e08a1b/datasets/01f14179528c1a67a23127b1af1c508f_gender",
+                "query": {
+                  "datasetName": "dataset1",
+                  "fields": [
+                    {
+                      "name": "gender",
+                      "expression": "`gender`"
+                    },
+                    {
+                      "name": "gender_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Gender",
+                "showTitle": true
+              },
+              "widgetType": "filter-multi-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "gender",
+                    "queryName": "dashboards/01f14179528c19aa8e30ab0726e08a1b/datasets/01f14179528c1a67a23127b1af1c508f_gender"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 9,
+            "y": 0,
+            "width": 3,
+            "height": 2
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_GLOBAL_FILTERS",
+      "layoutVersion": "GRID_V1"
+    },
+    {
+      "name": "services",
+      "displayName": "Services",
+      "layout": [
+        {
+          "widget": {
+            "name": "title",
+            "multilineTextboxSpec": {
+              "lines": [
+                "## Services & Churn\n",
+                "How add-on service subscriptions — protection, streaming, and communication — correlate with customer churn."
+              ]
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 12,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "heatmap_services",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "services_unpivot",
+                  "fields": [
+                    {
+                      "name": "Churn",
+                      "expression": "`Churn`"
+                    },
+                    {
+                      "name": "Service Name",
+                      "expression": "`Service Name`"
+                    },
+                    {
+                      "name": "count(customerID)",
+                      "expression": "COUNT(`customerID`)"
+                    }
+                  ],
+                  "filters": [
+                    {
+                      "expression": "`Status` = 'Yes'"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "frame": {
+                "title": "Subscriber Count by Service",
+                "showTitle": true
+              },
+              "mark": {
+                "layout": "stack"
+              },
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "Service Name",
+                  "axis": {
+                    "hideTitle": true
+                  },
+                  "displayName": "Service",
+                  "scale": {
+                    "type": "categorical",
+                    "sort": {
+                      "by": "y-reversed"
+                    }
+                  }
+                },
+                "y": {
+                  "fieldName": "count(customerID)",
+                  "displayName": "Subscribers",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "Churn",
+                  "legend": {
+                    "position": "bottom"
+                  },
+                  "displayName": "Churn",
+                  "scale": {
+                    "type": "categorical",
+                    "mappings": [
+                      {
+                        "value": "Yes",
+                        "color": "#E45756"
+                      },
+                      {
+                        "value": "No",
+                        "color": "#4C78A8"
+                      }
+                    ]
+                  }
+                },
+                "label": {
+                  "show": true
+                }
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 2,
+            "width": 8,
+            "height": 7
+          }
+        },
+        {
+          "widget": {
+            "name": "bar_category_churn",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "services_unpivot",
+                  "fields": [
+                    {
+                      "name": "Service Category",
+                      "expression": "`Service Category`"
+                    },
+                    {
+                      "name": "measure(Churn Rate)",
+                      "expression": "MEASURE(`Churn Rate`)"
+                    }
+                  ],
+                  "filters": [
+                    {
+                      "expression": "`Status` NOT IN ('No internet service', 'No phone service')"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "frame": {
+                "title": "Churn Rate by Service Category",
+                "showTitle": true
+              },
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "Service Category",
+                  "axis": {
+                    "hideTitle": true
+                  },
+                  "displayName": "Category",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fieldName": "measure(Churn Rate)",
+                  "format": {
+                    "type": "number-percent",
+                    "decimalPlaces": {
+                      "type": "exact",
+                      "places": 1
+                    }
+                  },
+                  "displayName": "Churn Rate",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "Service Category",
+                  "legend": {
+                    "hide": true
+                  },
+                  "displayName": "Category",
+                  "scale": {
+                    "type": "categorical",
+                    "mappings": [
+                      {
+                        "value": "Protection",
+                        "color": "#4C78A8"
+                      },
+                      {
+                        "value": "Entertainment",
+                        "color": "#F58518"
+                      },
+                      {
+                        "value": "Communication",
+                        "color": "#59A14F"
+                      }
+                    ]
+                  }
+                },
+                "label": {
+                  "show": true
+                }
+              }
+            }
+          },
+          "position": {
+            "x": 8,
+            "y": 2,
+            "width": 4,
+            "height": 7
+          }
+        },
+        {
+          "widget": {
+            "name": "bar_service_churn",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "services_unpivot",
+                  "fields": [
+                    {
+                      "name": "Status",
+                      "expression": "`Status`"
+                    },
+                    {
+                      "name": "Service Name",
+                      "expression": "`Service Name`"
+                    },
+                    {
+                      "name": "measure(Churn Rate)",
+                      "expression": "MEASURE(`Churn Rate`)"
+                    }
+                  ],
+                  "filters": [
+                    {
+                      "expression": "`Status` NOT IN ('No internet service', 'No phone service')"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "frame": {
+                "title": "Churn Rate: Subscribers vs Non-Subscribers",
+                "showTitle": true
+              },
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "Service Name",
+                  "axis": {
+                    "hideTitle": true
+                  },
+                  "displayName": "Service",
+                  "scale": {
+                    "type": "categorical",
+                    "sort": {
+                      "by": "y-reversed"
+                    }
+                  }
+                },
+                "y": {
+                  "fieldName": "measure(Churn Rate)",
+                  "format": {
+                    "type": "number-percent",
+                    "decimalPlaces": {
+                      "type": "exact",
+                      "places": 1
+                    }
+                  },
+                  "displayName": "Churn Rate",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "Status",
+                  "legend": {
+                    "position": "bottom"
+                  },
+                  "displayName": "Status",
+                  "scale": {
+                    "type": "categorical",
+                    "mappings": [
+                      {
+                        "value": "Yes",
+                        "color": "#4C78A8"
+                      },
+                      {
+                        "value": "No",
+                        "color": "#E45756"
+                      }
+                    ]
+                  }
+                },
+                "label": {
+                  "show": true
+                }
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 9,
+            "width": 6,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "bar_stacked_adoption",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "services_unpivot",
+                  "fields": [
+                    {
+                      "name": "Churn",
+                      "expression": "`Churn`"
+                    },
+                    {
+                      "name": "Service Name",
+                      "expression": "`Service Name`"
+                    },
+                    {
+                      "name": "count(customerID)",
+                      "expression": "COUNT(`customerID`)"
+                    }
+                  ],
+                  "filters": [
+                    {
+                      "expression": "`Status` = 'Yes'"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "frame": {
+                "title": "Churn % Among Subscribers",
+                "showTitle": true
+              },
+              "mark": {
+                "layout": "percent-stack"
+              },
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "Service Name",
+                  "axis": {
+                    "hideTitle": true
+                  },
+                  "displayName": "Service",
+                  "scale": {
+                    "type": "categorical",
+                    "sort": {
+                      "by": "y-reversed"
+                    }
+                  }
+                },
+                "y": {
+                  "fieldName": "count(customerID)",
+                  "displayName": "Customers",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "Churn",
+                  "legend": {
+                    "position": "bottom"
+                  },
+                  "displayName": "Churn",
+                  "scale": {
+                    "type": "categorical",
+                    "mappings": [
+                      {
+                        "value": "Yes",
+                        "color": "#E45756"
+                      },
+                      {
+                        "value": "No",
+                        "color": "#4C78A8"
+                      }
+                    ]
+                  }
+                },
+                "label": {
+                  "show": true
+                }
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 9,
+            "width": 6,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "pivot_services",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "services_summary",
+                  "fields": [
+                    {
+                      "name": "ServiceName",
+                      "expression": "`ServiceName`"
+                    },
+                    {
+                      "name": "Status",
+                      "expression": "`Status`"
+                    },
+                    {
+                      "name": "Customers",
+                      "expression": "`Customers`"
+                    },
+                    {
+                      "name": "ChurnRatePct",
+                      "expression": "`ChurnRatePct`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Service Churn Matrix",
+                "showTitle": true
+              },
+              "rowsPerPage": 25,
+              "widgetType": "table",
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "ServiceName",
+                    "displayName": "Service"
+                  },
+                  {
+                    "fieldName": "Status",
+                    "displayName": "Status"
+                  },
+                  {
+                    "fieldName": "Customers",
+                    "displayName": "Customers"
+                  },
+                  {
+                    "fieldName": "ChurnRatePct",
+                    "displayName": "Churn Rate %",
+                    "style": {
+                      "type": "basic",
+                      "rules": [
+                        {
+                          "condition": {
+                            "operand": {
+                              "type": "data-value",
+                              "value": "35"
+                            },
+                            "operator": ">"
+                          },
+                          "backgroundColor": "#FDECEC",
+                          "foregroundColor": "#E45756"
+                        },
+                        {
+                          "condition": {
+                            "operand": {
+                              "type": "data-value",
+                              "value": "15"
+                            },
+                            "operator": "<"
+                          },
+                          "backgroundColor": "#E8F5E9",
+                          "foregroundColor": "#2E7D32"
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 15,
+            "width": 12,
+            "height": 6
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_CANVAS",
+      "layoutVersion": "GRID_V1"
+    }
+  ],
+  "uiSettings": {
+    "theme": {
+      "canvasBackgroundColor": {
+        "light": "#F0F3F7",
+        "dark": "#1B2028"
+      },
+      "widgetBackgroundColor": {
+        "light": "#FFFFFF",
+        "dark": "#242D38"
+      },
+      "widgetBorderColor": {
+        "light": "#DAE0E8",
+        "dark": "#3A4555"
+      },
+      "fontColor": {
+        "light": "#2C3E50",
+        "dark": "#E8ECF1"
+      },
+      "selectionColor": {
+        "light": "#4C78A8",
+        "dark": "#6B9BD2"
+      },
+      "visualizationColors": [
+        "#4C78A8",
+        "#E45756",
+        "#F58518",
+        "#59A14F",
+        "#76B7B2",
+        "#EDC948",
+        "#B07AA1",
+        "#FF9DA7",
+        "#9C755F",
+        "#BAB0AC"
+      ],
+      "widgetHeaderAlignment": "LEFT",
+      "fontFamily": "Trebuchet MS"
+    },
+    "applyModeEnabled": false
+  }
+}
