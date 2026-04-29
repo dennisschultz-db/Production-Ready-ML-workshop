@@ -2,10 +2,11 @@
 
 
 |               |                                                                                               |
-| --------------- | :-------------------------------------------------------------------------------------------- |
+| ------------- | --------------------------------------------------------------------------------------------- |
 | **Format:**   | Two 2-hour instructor-led sessions with hands-on exercises                                    |
-| **Dataset:**  | IBM Telco Customer Churn — binary classification, ~7K rows                                   |
+| **Dataset:**  | IBM Telco Customer Churn — binary classification, ~7K rows                                    |
 | **Platform:** | Databricks (serverless notebooks, Unity Catalog, MLflow, Model Serving, Lakehouse Monitoring) |
+
 
 ---
 
@@ -19,18 +20,21 @@ Participants take a customer churn prediction model from a messy notebook all th
 
 > **Pre-session:** Participants run `00_setup_participant.ipynb` before the formal session begins to create their personal schema and verify data access.
 
-| # | Module | Duration | Artifacts Created |
-|---|---|---|---|
-| 01 | `01_data_exploration` | 15 min | — (Genie Space query, visualizations) |
-| 02 | `02_messy_notebook` | 5 min *(instructor demo)* | — |
-| 03 | `03_refactored_pipeline` | 20 min | 1 MLflow run, trained sklearn pipeline |
-| 04 | `04_mlflow_experiment` | 25 min | Feature Store table `churn_features`, 3 MLflow runs, experiment |
-| 05 | `05_register_and_serve` | 25 min | UC model versions `@champion` + `@serving`, serving endpoint |
-| 06 | `06_llm_explanation` | 25 min | Personal prompt version in shared Prompt Registry |
-| 07 | `07_production_checklist` | 12 min | — (pytest + data quality check results) |
-|    | Total | 127 min | |
+
+| #   | Module                    | Duration                  | Artifacts Created                                               |
+| --- | ------------------------- | ------------------------- | --------------------------------------------------------------- |
+| 01  | `01_data_exploration`     | 15 min                    | — (Genie Space query, visualizations)                           |
+| 02  | `02_messy_notebook`       | 5 min *(instructor demo)* | —                                                               |
+| 03  | `03_refactored_pipeline`  | 20 min                    | 1 MLflow run, trained sklearn pipeline                          |
+| 04  | `04_mlflow_experiment`    | 25 min                    | Feature Store table `churn_features`, 3 MLflow runs, experiment |
+| 05  | `05_register_and_serve`   | 25 min                    | UC model versions `@champion` + `@serving`, serving endpoint    |
+| 06  | `06_llm_explanation`      | 25 min                    | Personal prompt version in shared Prompt Registry               |
+| 07  | `07_production_checklist` | 12 min                    | — (pytest + data quality check results)                         |
+|     | Total                     | 127 min                   |                                                                 |
+
 
 **What participants leave with:**
+
 - How to structure ML code as a testable, reusable Python package rather than a monolithic notebook
 - How to use MLflow to track experiments, compare model types, and maintain lineage from raw data to registered model
 - How Unity Catalog Model Registry works: versioning, dual aliases (`@champion` for batch scoring, `@serving` for the endpoint), and governance
@@ -38,12 +42,14 @@ Participants take a customer churn prediction model from a messy notebook all th
 
 ### Session 1 error-prone areas
 
-| Risk | Where | Mitigation |
-|---|---|---|
-| REST API cell runs before endpoint is ready | `05` — endpoint creation is async (~5-10 min spin-up) | Instruct participants to check Serving UI for "Ready" status before running the final REST cell |
-| `best_run_id` widget not populated | `05` — reads from prior task values or manual widget input | If running standalone (not via job), participants must copy the run ID from `04`'s output |
-| LLM gateway cold start | `06` — first call may take 30+ sec | Instructor starts the `01_keep_endpoint_warm notebook` before the workshop begins.  Don't for get to turn it off after the workshop! |
-| pip install adds cluster variance | `03`, `04`, `05`, `06` | Pre-installing the `churn_model` wheel in the cluster init script would eliminate this, but the current design is a teaching moment about options. |
+
+| Risk                                        | Where                                                      | Mitigation                                                                                                                                         |
+| ------------------------------------------- | ---------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| REST API cell runs before endpoint is ready | `05` — endpoint creation is async (~5-10 min spin-up)      | Instruct participants to check Serving UI for "Ready" status before running the final REST cell                                                    |
+| `best_run_id` widget not populated          | `05` — reads from prior task values or manual widget input | If running standalone (not via job), participants must copy the run ID from `04`'s output                                                          |
+| LLM gateway cold start                      | `06` — first call may take 30+ sec                         | Instructor starts the `01_keep_endpoint_warm notebook` before the workshop begins. Don't for get to turn it off after the workshop!                |
+| pip install adds cluster variance           | `03`, `04`, `05`, `06`                                     | Pre-installing the `churn_model` wheel in the cluster init script would eliminate this, but the current design is a teaching moment about options. |
+
 
 ---
 
@@ -51,20 +57,23 @@ Participants take a customer churn prediction model from a messy notebook all th
 
 > Session 2 opens with `07_production_checklist` from Session 1 as a 10-minute bridge: "here's what we built — here's what's still missing."
 
-| # | Module | Duration | Artifacts Created |
-|---|---|---|---|
-| — | `07_production_checklist` *(bridge)* | 10 min | — |
-| 01 | `01_cicd_overview` | 13 min | Deployed bundle, running retrain job (async) |
-| 02 | `02_simulate_drift` | 20 min | `telco_churn_new_training_data`, `churn_inference_log` |
-| 03 | `03_monitoring_setup` | 15 min | Lakehouse Monitor, `_profile_metrics` + `_drift_metrics` tables (async refresh) |
-| 04 | `04_drift_alerts` | 12 min | DBSQL alert on PSI threshold |
-| 05 | `05_trigger_retrain` | 10 min | Retrain job run (async, 10-15 min pipeline) |
-| 06 | `06_ab_canary_setup` | 15 min | — (reads live endpoint state; UI-driven traffic split) |
-| 07 | `07_incident_runbook` | 22 min *(bonus)* | Rolled-back endpoint config, retrain job run |
-| 08 | `08_client_deployment` | 18 min *(discussion)* | — |
-|    | Total | 125 min | |
+
+| #   | Module                               | Duration              | Artifacts Created                                                               |
+| --- | ------------------------------------ | --------------------- | ------------------------------------------------------------------------------- |
+| —   | `07_production_checklist` *(bridge)* | 10 min                | —                                                                               |
+| 01  | `01_cicd_overview`                   | 13 min                | Deployed bundle, running retrain job (async)                                    |
+| 02  | `02_simulate_drift`                  | 20 min                | `telco_churn_new_training_data`, `churn_inference_log`                          |
+| 03  | `03_monitoring_setup`                | 15 min                | Lakehouse Monitor, `_profile_metrics` + `_drift_metrics` tables (async refresh) |
+| 04  | `04_drift_alerts`                    | 12 min                | DBSQL alert on PSI threshold                                                    |
+| 05  | `05_trigger_retrain`                 | 10 min                | Retrain job run (async, 10-15 min pipeline)                                     |
+| 06  | `06_ab_canary_setup`                 | 15 min                | — (reads live endpoint state; UI-driven traffic split)                          |
+| 07  | `07_incident_runbook`                | 22 min *(bonus)*      | Rolled-back endpoint config, retrain job run                                    |
+| 08  | `08_client_deployment`               | 18 min *(discussion)* | —                                                                               |
+|     | Total                                | 125 min               |                                                                                 |
+
 
 **What participants leave with:**
+
 - How to automate the full retraining lifecycle with Databricks Jobs: task dependencies, deployment gates that block underperforming models
 - How to manage risk during model updates using canary deployments and UI-driven traffic splits
 - How Lakehouse Monitoring detects data drift using PSI, and how to wire it to automated DBSQL alerts
@@ -72,12 +81,14 @@ Participants take a customer churn prediction model from a messy notebook all th
 
 ### Session 2 error-prone areas
 
-| Risk | Where | Mitigation |
-|---|---|---|
-| `06_ab_canary_setup` reads stale endpoint state | Retrain job from `05` takes 10-15 min; `06` may open before it finishes | Add note: if only one model version is visible, wait 1-2 min and re-run the inspect cells |
-| `04_drift_alerts` runs before monitor refresh completes | Monitor refresh from `03` takes 5-10 min | Notebook warns participants; they can proceed and re-run the query cell once refresh is done |
-| Bundle deploy fails if DABs in Workspace not enabled | `01_cicd_overview` | Verify the feature is enabled in the workspace before the workshop |
-| Alert subscription UI path changes between DBR versions | `04_drift_alerts` — legacy SQL alerts UI | Test the subscription flow in the target workspace before the session |
+
+| Risk                                                    | Where                                                                   | Mitigation                                                                                   |
+| ------------------------------------------------------- | ----------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| `06_ab_canary_setup` reads stale endpoint state         | Retrain job from `05` takes 10-15 min; `06` may open before it finishes | Add note: if only one model version is visible, wait 1-2 min and re-run the inspect cells    |
+| `04_drift_alerts` runs before monitor refresh completes | Monitor refresh from `03` takes 5-10 min                                | Notebook warns participants; they can proceed and re-run the query cell once refresh is done |
+| Bundle deploy fails if DABs in Workspace not enabled    | `01_cicd_overview`                                                      | Verify the feature is enabled in the workspace before the workshop                           |
+| Alert subscription UI path changes between DBR versions | `04_drift_alerts` — legacy SQL alerts UI                                | Test the subscription flow in the target workspace before the session                        |
+
 
 ---
 
@@ -123,16 +134,18 @@ instructor/
 
 Run `instructor/scripts/00_instructor_setup.ipynb` (requires workspace admin) before the workshop. The notebook is broken into numbered steps — run them in order:
 
-| Step | What it does |
-|---|---|
-| 1–2 | Set catalog, create `00_shared` schema |
-| 3–3b | Create UC Volumes, copy CSV and wheel |
-| 4 | Load `telco_churn` Delta table (7,043 rows) |
-| 5 | Create `telco_churn_holdout` (stratified 15% sample) |
-| 6 | Grant permissions to `account users` |
-| 7 | Create `foundation_model_with_gateway` serving endpoint with AI Gateway guardrails |
-| 8 | Register `churn_explainer` prompt `@production` in shared Prompt Registry |
-| 9 | Create shared Genie Space on `telco_churn`; prints `space_id` |
+
+| Step | What it does                                                                       |
+| ---- | ---------------------------------------------------------------------------------- |
+| 1–2  | Set catalog, create `00_shared` schema                                             |
+| 3–3b | Create UC Volumes, copy CSV and wheel                                              |
+| 4    | Load `telco_churn` Delta table (7,043 rows)                                        |
+| 5    | Create `telco_churn_holdout` (stratified 15% sample)                               |
+| 6    | Grant permissions to `account users`                                               |
+| 7    | Create `foundation_model_with_gateway` serving endpoint with AI Gateway guardrails |
+| 8    | Register `churn_explainer` prompt `@production` in shared Prompt Registry          |
+| 9    | Create shared Genie Space on `telco_churn`; prints `space_id`                      |
+
 
 After Step 9: paste the printed `space_id` into `participant/utils/config.ipynb` to replace the `genie_space_id` placeholder.
 
@@ -140,17 +153,19 @@ After Step 9: paste the printed `space_id` into `participant/utils/config.ipynb`
 
 ## Participant Permissions Required
 
-| Permission | Resource | Purpose |
-|---|---|---|
-| `USE CATALOG` | `workshop` | Access the catalog |
-| `BROWSE` | `workshop` | See catalog in Explorer |
-| `CREATE SCHEMA` | `workshop` | Participants create `workshop.<username>` |
-| `USE SCHEMA` | `workshop.00_shared` | Access shared data |
-| `SELECT` | `workshop.00_shared.telco_churn` | Read training data |
-| `SELECT` | `workshop.00_shared.telco_churn_holdout` | Read holdout data for deployment gate |
-| `READ VOLUME` | `workshop.00_shared.raw_files` | Access raw CSV |
-| `READ VOLUME` | `workshop.00_shared.wheels` | Install `churn_model` wheel |
-| `CAN_QUERY` | `foundation_model_with_gateway` endpoint | Call LLM from `06_llm_explanation` |
+
+| Permission      | Resource                                 | Purpose                                   |
+| --------------- | ---------------------------------------- | ----------------------------------------- |
+| `USE CATALOG`   | `workshop`                               | Access the catalog                        |
+| `BROWSE`        | `workshop`                               | See catalog in Explorer                   |
+| `CREATE SCHEMA` | `workshop`                               | Participants create `workshop.<username>` |
+| `USE SCHEMA`    | `workshop.00_shared`                     | Access shared data                        |
+| `SELECT`        | `workshop.00_shared.telco_churn`         | Read training data                        |
+| `SELECT`        | `workshop.00_shared.telco_churn_holdout` | Read holdout data for deployment gate     |
+| `READ VOLUME`   | `workshop.00_shared.raw_files`           | Access raw CSV                            |
+| `READ VOLUME`   | `workshop.00_shared.wheels`              | Install `churn_model` wheel               |
+| `CAN_QUERY`     | `foundation_model_with_gateway` endpoint | Call LLM from `06_llm_explanation`        |
+
 
 All granted via `GRANT ... TO 'account users'` in the instructor setup notebook.
 
@@ -226,3 +241,4 @@ All granted via `GRANT ... TO 'account users'` in the instructor setup notebook.
 ║    detect → diagnose → rollback @champion → re-trigger retrain                    ║
 ╚════════════════════════════════════════════════════════════════════════════════════╝
 ```
+
