@@ -115,7 +115,7 @@ participant/
 │   ├── 07_incident_runbook.ipynb       # bonus — run if time allows
 │   └── 08_client_deployment.ipynb      # discussion / leave-behind
 ├── utils/
-│   ├── config.ipynb                    # sets catalog, schema, safe_username, genie_space_id
+│   ├── config.ipynb                    # sets catalog, schema, safe_username
 │   └── resources/                      # diagrams embedded in notebooks (PNG)
 └── bundle/
     ├── databricks.yml                  # DAB root — schema auto-derived from current_user()
@@ -144,10 +144,9 @@ Run `instructor/scripts/00_instructor_setup.ipynb` (requires workspace admin) be
 | 6    | Grant permissions to `account users`                                               |
 | 7    | Create `foundation_model_with_gateway` serving endpoint with AI Gateway guardrails |
 | 8    | Register `churn_explainer` prompt `@production` in shared Prompt Registry          |
-| 9    | Create shared Genie Space on `telco_churn`; prints `space_id`                      |
 
 
-After Step 9: paste the printed `space_id` into `participant/utils/config.ipynb` to replace the `genie_space_id` placeholder.
+
 
 ---
 
